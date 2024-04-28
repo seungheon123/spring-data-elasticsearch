@@ -673,8 +673,8 @@ public class Criteria {
 	 */
 	public Criteria boundedBy(String topLeftGeohash, String bottomRightGeohash) {
 
-		Assert.isTrue(!StringUtils.isEmpty(topLeftGeohash), "topLeftGeohash must not be empty");
-		Assert.isTrue(!StringUtils.isEmpty(bottomRightGeohash), "bottomRightGeohash must not be empty");
+		Assert.isTrue(StringUtils.hasLength(topLeftGeohash), "topLeftGeohash must not be empty");
+		Assert.isTrue(StringUtils.hasLength(bottomRightGeohash), "bottomRightGeohash must not be empty");
 
 		filterCriteriaEntries
 				.add(new CriteriaEntry(OperationKey.BBOX, new Object[] { topLeftGeohash, bottomRightGeohash }));
@@ -757,7 +757,7 @@ public class Criteria {
 	 */
 	public Criteria within(String geoLocation, String distance) {
 
-		Assert.isTrue(!StringUtils.isEmpty(geoLocation), "geoLocation value must not be null");
+		Assert.isTrue(StringUtils.hasLength(geoLocation), "geoLocation value must not be null");
 
 		filterCriteriaEntries.add(new CriteriaEntry(OperationKey.WITHIN, new Object[] { geoLocation, distance }));
 		return this;
@@ -814,6 +814,32 @@ public class Criteria {
 		Assert.notNull(geoShape, "geoShape must not be null");
 
 		filterCriteriaEntries.add(new CriteriaEntry(OperationKey.GEO_CONTAINS, geoShape));
+		return this;
+	}
+
+	/**
+	 * Adds a new filter CriteriaEntry for HAS_CHILD.
+	 *
+	 * @param query the has_child query.
+	 * @return the current Criteria.
+	 */
+	public Criteria hasChild(HasChildQuery query) {
+		Assert.notNull(query, "has_child query must not be null.");
+
+		queryCriteriaEntries.add(new CriteriaEntry(OperationKey.HAS_CHILD, query));
+		return this;
+	}
+
+	/**
+	 * Adds a new filter CriteriaEntry for HAS_PARENT.
+	 *
+	 * @param query the has_parent query.
+	 * @return the current Criteria.
+	 */
+	public Criteria hasParent(HasParentQuery query) {
+		Assert.notNull(query, "has_parent query must not be null.");
+
+		queryCriteriaEntries.add(new CriteriaEntry(OperationKey.HAS_PARENT, query));
 		return this;
 	}
 	// endregion
@@ -977,7 +1003,11 @@ public class Criteria {
 		/**
 		 * @since 5.1
 		 */
-		REGEXP;
+		REGEXP,
+		/**
+		 * @since 5.3
+		 */
+		HAS_CHILD, HAS_PARENT;
 
 		/**
 		 * @return true if this key does not have an associated value

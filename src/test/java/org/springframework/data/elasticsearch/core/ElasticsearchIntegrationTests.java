@@ -612,7 +612,8 @@ public abstract class ElasticsearchIntegrationTests {
 
 		// when
 		Query query = getTermQuery("id", documentId);
-		operations.delete(query, SampleEntity.class, IndexCoordinates.of(indexNameProvider.indexName()));
+		operations.delete(DeleteQuery.builder(query).build(), SampleEntity.class,
+				IndexCoordinates.of(indexNameProvider.indexName()));
 
 		// then
 		Query searchQuery = getTermQuery("id", documentId);
@@ -643,7 +644,7 @@ public abstract class ElasticsearchIntegrationTests {
 
 		// when
 		Query query = getTermQuery("message", "foo");
-		operations.delete(query, SampleEntity.class, IndexCoordinates.of(MULTI_INDEX_ALL));
+		operations.delete(DeleteQuery.builder(query).build(), SampleEntity.class, IndexCoordinates.of(MULTI_INDEX_ALL));
 
 		// then
 		assertThat(operations.count(query, IndexCoordinates.of(MULTI_INDEX_1_NAME, MULTI_INDEX_2_NAME))).isEqualTo(0);
@@ -674,7 +675,7 @@ public abstract class ElasticsearchIntegrationTests {
 		// when
 		Query query = getTermQuery("message", "negative");
 
-		operations.delete(query, SampleEntity.class, IndexCoordinates.of("test-index-*"));
+		operations.delete(DeleteQuery.builder(query).build(), SampleEntity.class, IndexCoordinates.of("test-index-*"));
 
 		operations.indexOps(IndexCoordinates.of(MULTI_INDEX_1_NAME)).refresh();
 		operations.indexOps(IndexCoordinates.of(MULTI_INDEX_2_NAME)).refresh();
@@ -1036,7 +1037,8 @@ public abstract class ElasticsearchIntegrationTests {
 		CriteriaQuery criteriaQuery = new CriteriaQuery(new Criteria("message").contains("test"));
 
 		// when
-		operations.delete(criteriaQuery, SampleEntity.class, IndexCoordinates.of(indexNameProvider.indexName()));
+		operations.delete(DeleteQuery.builder(criteriaQuery).build(), SampleEntity.class,
+				IndexCoordinates.of(indexNameProvider.indexName()));
 
 		// then
 		StringQuery stringQuery = new StringQuery(MATCH_ALL);
@@ -2494,7 +2496,8 @@ public abstract class ElasticsearchIntegrationTests {
 
 		// when
 		Query query = operations.idsQuery(Arrays.asList(documentIdToDelete));
-		operations.delete(query, SampleEntity.class, IndexCoordinates.of(indexNameProvider.indexName()));
+		operations.delete(DeleteQuery.builder(query).build(), SampleEntity.class,
+				IndexCoordinates.of(indexNameProvider.indexName()));
 
 		// then
 		// document with id "remainingDocumentId" should still be indexed
@@ -2524,7 +2527,8 @@ public abstract class ElasticsearchIntegrationTests {
 
 		// when
 		CriteriaQuery criteriaQuery = new CriteriaQuery(new Criteria("id").is(documentIdToDelete));
-		operations.delete(criteriaQuery, SampleEntity.class, IndexCoordinates.of(indexNameProvider.indexName()));
+		operations.delete(DeleteQuery.builder(criteriaQuery).build(), SampleEntity.class,
+				IndexCoordinates.of(indexNameProvider.indexName()));
 
 		// then
 		// document with id "remainingDocumentId" should still be indexed
@@ -2861,16 +2865,28 @@ public abstract class ElasticsearchIntegrationTests {
 	}
 
 	@Document(indexName = MULTI_INDEX_2_NAME)
-	class ResultAggregator {
+	static class ResultAggregator {
 
-		private String id;
-		private String firstName;
-		private String lastName;
+		private final String id;
+		private final String firstName;
+		private final String lastName;
 
 		ResultAggregator(String id, String firstName, String lastName) {
 			this.id = id;
 			this.firstName = firstName;
 			this.lastName = lastName;
+		}
+
+		public String getId() {
+			return id;
+		}
+
+		public String getFirstName() {
+			return firstName;
+		}
+
+		public String getLastName() {
+			return lastName;
 		}
 	}
 
@@ -3457,7 +3473,7 @@ public abstract class ElasticsearchIntegrationTests {
 
 	private void shouldDeleteEntityWithJoinFields(String qId2, String aId2) throws Exception {
 
-		operations.delete(getQueryForParentId("answer", qId2, qId2), SampleJoinEntity.class,
+		operations.delete(DeleteQuery.builder(getQueryForParentId("answer", qId2, qId2)).build(), SampleJoinEntity.class,
 				IndexCoordinates.of(indexNameProvider.indexName()));
 
 		SearchHits<SampleJoinEntity> deletedHits = operations.search(getQueryForParentId("answer", qId2, null),
@@ -3809,6 +3825,68 @@ public abstract class ElasticsearchIntegrationTests {
 
 		// Then
 		assertThat(result.getDeleted()).isEqualTo(0);
+	}
+
+	@Test
+	public void shouldGetOnlyDocumentsThatHasChild() {
+		// Given
+		String indexName = indexNameProvider.indexName() + "-join";
+		operations.indexOps(RootEntity.class).createWithMapping();
+
+		RootEntity parentEntity = RootEntity.builder()
+				.withId(nextIdAsString())
+				.withParent(new RootEntity.Parent())
+				.build();
+		IndexQuery indexQuery = new IndexQueryBuilder().withId(parentEntity.id).withObject(parentEntity).build();
+		operations.index(indexQuery, IndexCoordinates.of(indexName));
+
+		RootEntity childEntity = RootEntity.builder()
+				.withId(nextIdAsString())
+				.withChild(new RootEntity.Child())
+				.withRelation(new JoinField<>("child", parentEntity.id))
+				.build();
+		indexQuery = new IndexQueryBuilder().withId(childEntity.id).withObject(childEntity).build();
+		operations.index(indexQuery, IndexCoordinates.of(indexName));
+
+		HasChildQuery childQuery = HasChildQuery.builder("child").withQuery(operations.matchAllQuery()).build();
+		Query query = CriteriaQuery.builder(Criteria.where("child").hasChild(childQuery)).build();
+
+		// When
+		SearchHits<RootEntity> hits = operations.search(query, RootEntity.class);
+
+		// Then
+		assertThat(hits.getTotalHits()).isEqualTo(1);
+	}
+
+	@Test
+	public void shouldGetOnlyDocumentsThatHasParent() {
+		// Given
+		String indexName = indexNameProvider.indexName() + "-join";
+		operations.indexOps(RootEntity.class).createWithMapping();
+
+		RootEntity parentEntity = RootEntity.builder()
+				.withId(nextIdAsString())
+				.withParent(new RootEntity.Parent())
+				.build();
+		IndexQuery indexQuery = new IndexQueryBuilder().withId(parentEntity.id).withObject(parentEntity).build();
+		operations.index(indexQuery, IndexCoordinates.of(indexName));
+
+		RootEntity childEntity = RootEntity.builder()
+				.withId(nextIdAsString())
+				.withChild(new RootEntity.Child())
+				.withRelation(new JoinField<>("child", parentEntity.id))
+				.build();
+		indexQuery = new IndexQueryBuilder().withId(childEntity.id).withObject(childEntity).build();
+		operations.index(indexQuery, IndexCoordinates.of(indexName));
+
+		HasParentQuery childQuery = HasParentQuery.builder("parent").withQuery(operations.matchAllQuery()).build();
+		Query query = CriteriaQuery.builder(Criteria.where("parent").hasParent(childQuery)).build();
+
+		// When
+		SearchHits<RootEntity> hits = operations.search(query, RootEntity.class);
+
+		// Then
+		assertThat(hits.getTotalHits()).isEqualTo(1);
 	}
 
 	// region entities
@@ -4930,6 +5008,107 @@ public abstract class ElasticsearchIntegrationTests {
 
 		public void setIndexedIndexName(@Nullable String indexedIndexName) {
 			this.indexedIndexName = indexedIndexName;
+		}
+	}
+
+	@Document(indexName = "#{@indexNameProvider.indexName()}-join")
+	private static class RootEntity {
+		@Id private String id;
+
+		@Field(type = FieldType.Object) private Child child;
+
+		@Field(type = FieldType.Object) private Parent parent;
+
+		@JoinTypeRelations(relations = {
+				@JoinTypeRelation(parent = "parent", children = { "child" })
+		}) private JoinField<String> relation = new JoinField<>("parent");
+
+		private static final class Child {}
+
+		private static final class Parent {}
+
+		public static Builder builder() {
+			return new Builder();
+		}
+
+		public String getId() {
+			return id;
+		}
+
+		public void setId(String id) {
+			this.id = id;
+		}
+
+		public Child getChild() {
+			return child;
+		}
+
+		public void setChild(@Nullable Child child) {
+			this.child = child;
+		}
+
+		public Parent getParent() {
+			return parent;
+		}
+
+		public void setParent(@Nullable Parent parent) {
+			this.parent = parent;
+		}
+
+		public JoinField<String> getRelation() {
+			if (relation == null) {
+				relation = new JoinField<>("parent");
+			}
+
+			return relation;
+		}
+
+		public void setRelation(JoinField<String> relation) {
+			this.relation = relation;
+		}
+
+		public static final class Builder {
+			@Nullable private String id;
+
+			@Nullable private Parent parent;
+			@Nullable private Child child;
+			private JoinField<String> relation = new JoinField<>("parent");
+
+			private Builder() {}
+
+			public Builder withId(@Nullable String id) {
+				this.id = id;
+
+				return this;
+			}
+
+			public Builder withParent(@Nullable Parent parent) {
+				this.parent = parent;
+
+				return this;
+			}
+
+			public Builder withChild(@Nullable Child child) {
+				this.child = child;
+
+				return this;
+			}
+
+			public Builder withRelation(JoinField<String> relation) {
+				this.relation = relation;
+
+				return this;
+			}
+
+			public RootEntity build() {
+				RootEntity root = new RootEntity();
+				root.setId(id);
+				root.setParent(parent);
+				root.setChild(child);
+				root.setRelation(relation);
+
+				return root;
+			}
 		}
 	}
 	// endregion

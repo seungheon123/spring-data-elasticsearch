@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2024 the original author or authors.
+ * Copyright 2016-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import org.springframework.lang.Nullable;
  */
 public class FetchSourceFilterBuilder {
 
+	@Nullable private Boolean fetchSource;
 	@Nullable private String[] includes;
 	@Nullable private String[] excludes;
 
@@ -38,12 +39,17 @@ public class FetchSourceFilterBuilder {
 		return this;
 	}
 
+	public FetchSourceFilterBuilder withFetchSource(Boolean fetchSource) {
+		this.fetchSource = fetchSource;
+		return this;
+	}
+
 	public SourceFilter build() {
 		if (includes == null)
 			includes = new String[0];
 		if (excludes == null)
 			excludes = new String[0];
 
-		return new FetchSourceFilter(includes, excludes);
+		return new FetchSourceFilter(fetchSource, includes, excludes);
 	}
 }

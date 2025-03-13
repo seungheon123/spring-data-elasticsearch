@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2024 the original author or authors.
+ * Copyright 2021-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -407,12 +407,6 @@ abstract public class AbstractReactiveElasticsearchTemplate
 	}
 
 	abstract protected Mono<String> doDeleteById(String id, @Nullable String routing, IndexCoordinates index);
-
-	@Override
-	@Deprecated
-	public Mono<ByQueryResponse> delete(Query query, Class<?> entityType) {
-		return delete(query, entityType, getIndexCoordinatesFor(entityType));
-	}
 
 	@Override
 	public Mono<ByQueryResponse> delete(DeleteQuery query, Class<?> entityType) {

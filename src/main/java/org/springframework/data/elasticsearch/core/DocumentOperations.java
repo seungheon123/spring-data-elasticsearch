@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2024 the original author or authors.
+ * Copyright 2019-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -276,38 +276,12 @@ public interface DocumentOperations {
 	 * Delete all records matching the query.
 	 *
 	 * @param query query defining the objects
-	 * @param clazz The entity class, must be annotated with
-	 *          {@link org.springframework.data.elasticsearch.annotations.Document}
-	 * @return response with detailed information
-	 * @since 4.1
-	 * @deprecated since 5.3.0, use {@link #delete(DeleteQuery, Class)}
-	 */
-	@Deprecated
-	ByQueryResponse delete(Query query, Class<?> clazz);
-
-	/**
-	 * Delete all records matching the query.
-	 *
-	 * @param query query defining the objects
 	 * @param clazz The entity class must be annotated with
 	 *          {@link org.springframework.data.elasticsearch.annotations.Document}
 	 * @return response with detailed information
 	 * @since 5.3
 	 */
 	ByQueryResponse delete(DeleteQuery query, Class<?> clazz);
-
-	/**
-	 * Delete all records matching the query.
-	 *
-	 * @param query query defining the objects
-	 * @param clazz The entity class, must be annotated with
-	 *          {@link org.springframework.data.elasticsearch.annotations.Document}
-	 * @param index the index from which to delete
-	 * @return response with detailed information
-	 * @deprecated since 5.3.0, use {@link #delete(DeleteQuery, Class, IndexCoordinates)}
-	 */
-	@Deprecated
-	ByQueryResponse delete(Query query, Class<?> clazz, IndexCoordinates index);
 
 	/**
 	 * Delete all records matching the query.

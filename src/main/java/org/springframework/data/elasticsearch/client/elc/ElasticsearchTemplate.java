@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2024 the original author or authors.
+ * Copyright 2021-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,8 @@ import co.elastic.clients.elasticsearch.core.*;
 import co.elastic.clients.elasticsearch.core.bulk.BulkResponseItem;
 import co.elastic.clients.elasticsearch.core.msearch.MultiSearchResponseItem;
 import co.elastic.clients.elasticsearch.core.search.ResponseBody;
+import co.elastic.clients.elasticsearch.sql.ElasticsearchSqlClient;
+import co.elastic.clients.elasticsearch.sql.QueryResponse;
 import co.elastic.clients.json.JsonpMapper;
 import co.elastic.clients.transport.Version;
 
@@ -56,6 +58,7 @@ import org.springframework.data.elasticsearch.core.query.UpdateResponse;
 import org.springframework.data.elasticsearch.core.reindex.ReindexRequest;
 import org.springframework.data.elasticsearch.core.reindex.ReindexResponse;
 import org.springframework.data.elasticsearch.core.script.Script;
+import org.springframework.data.elasticsearch.core.sql.SqlResponse;
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 
@@ -74,6 +77,7 @@ public class ElasticsearchTemplate extends AbstractElasticsearchTemplate {
 	private static final Log LOGGER = LogFactory.getLog(ElasticsearchTemplate.class);
 
 	private final ElasticsearchClient client;
+	private final ElasticsearchSqlClient sqlClient;
 	private final RequestConverter requestConverter;
 	private final ResponseConverter responseConverter;
 	private final JsonpMapper jsonpMapper;
@@ -85,6 +89,7 @@ public class ElasticsearchTemplate extends AbstractElasticsearchTemplate {
 		Assert.notNull(client, "client must not be null");
 
 		this.client = client;
+		this.sqlClient = client.sql();
 		this.jsonpMapper = client._transport().jsonpMapper();
 		requestConverter = new RequestConverter(elasticsearchConverter, jsonpMapper);
 		responseConverter = new ResponseConverter(jsonpMapper);
@@ -97,6 +102,7 @@ public class ElasticsearchTemplate extends AbstractElasticsearchTemplate {
 		Assert.notNull(client, "client must not be null");
 
 		this.client = client;
+		this.sqlClient = client.sql();
 		this.jsonpMapper = client._transport().jsonpMapper();
 		requestConverter = new RequestConverter(elasticsearchConverter, jsonpMapper);
 		responseConverter = new ResponseConverter(jsonpMapper);
@@ -173,19 +179,6 @@ public class ElasticsearchTemplate extends AbstractElasticsearchTemplate {
 	@Override
 	public ByQueryResponse delete(DeleteQuery query, Class<?> clazz) {
 		return delete(query, clazz, getIndexCoordinatesFor(clazz));
-	}
-
-	@Override
-	public ByQueryResponse delete(Query query, Class<?> clazz, IndexCoordinates index) {
-
-		Assert.notNull(query, "query must not be null");
-
-		DeleteByQueryRequest request = requestConverter.documentDeleteByQueryRequest(query, routingResolver.getRouting(),
-				clazz, index, getRefreshPolicy());
-
-		DeleteByQueryResponse response = execute(client -> client.deleteByQuery(request));
-
-		return responseConverter.byQueryResponse(response);
 	}
 
 	@Override
@@ -655,6 +648,19 @@ public class ElasticsearchTemplate extends AbstractElasticsearchTemplate {
 
 		DeleteScriptRequest request = requestConverter.scriptDelete(name);
 		return execute(client -> client.deleteScript(request)).acknowledged();
+	}
+
+	@Override
+	public SqlResponse search(SqlQuery query) {
+		Assert.notNull(query, "Query must not be null.");
+
+		try {
+			QueryResponse response = sqlClient.query(requestConverter.sqlQueryRequest(query));
+
+			return responseConverter.sqlResponse(response);
+		} catch (IOException e) {
+			throw exceptionTranslator.translateException(e);
+		}
 	}
 	// endregion
 

@@ -1,0 +1,30 @@
+[[elasticsearch-migration-guide-5.4-5.5]]
+= Upgrading from 5.4.x to 5.5.x
+
+This section describes breaking changes from version 5.4.x to 5.5.x and how removed features can be replaced by new introduced features.
+
+[[elasticsearch-migration-guide-5.4-5.5.breaking-changes]]
+== Breaking Changes
+
+[[elasticsearch-migration-guide-5.4-5.5.deprecations]]
+== Deprecations
+
+Some classes that probably are not used by a library user have been renamed, the classes with the old names are still there, but are deprecated:
+
+|===
+|old name|new name
+
+|ElasticsearchPartQuery|RepositoryPartQuery
+|ElasticsearchStringQuery|RepositoryStringQuery
+|ReactiveElasticsearchStringQuery|ReactiveRepositoryStringQuery
+|===
+
+=== Removals
+
+The following methods that had been deprecated since release 5.3 have been removed:
+```
+DocumentOperations.delete(Query, Class<?>)
+DocumentOperations.delete(Query, Class<?>, IndexCoordinates)
+ReactiveDocumentOperations.delete(Query, Class<?>)
+ReactiveDocumentOperations.delete(Query, Class<?>, IndexCoordinates)
+```

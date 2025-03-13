@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2024 the original author or authors.
+ * Copyright 2013-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -99,6 +99,13 @@ public @interface Document {
 	 * @since 5.1
 	 */
 	boolean storeVersionInSource() default true;
+
+	/**
+	 * Aliases for the index.
+	 *
+	 * @since 5.4
+	 */
+	Alias[] aliases() default {};
 
 	/**
 	 * @since 4.3

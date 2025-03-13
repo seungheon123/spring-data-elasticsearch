@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2024 the original author or authors.
+ * Copyright 2019-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,8 +19,8 @@ import org.springframework.data.elasticsearch.core.ReactiveElasticsearchOperatio
 import org.springframework.data.elasticsearch.core.query.BaseQuery;
 import org.springframework.data.elasticsearch.core.query.CriteriaQuery;
 import org.springframework.data.elasticsearch.repository.query.parser.ElasticsearchQueryCreator;
-import org.springframework.data.repository.query.QueryMethodEvaluationContextProvider;
 import org.springframework.data.repository.query.ResultProcessor;
+import org.springframework.data.repository.query.ValueExpressionDelegate;
 import org.springframework.data.repository.query.parser.PartTree;
 
 /**
@@ -35,8 +35,9 @@ public class ReactivePartTreeElasticsearchQuery extends AbstractReactiveElastics
 
 	public ReactivePartTreeElasticsearchQuery(ReactiveElasticsearchQueryMethod queryMethod,
 			ReactiveElasticsearchOperations elasticsearchOperations,
-			QueryMethodEvaluationContextProvider evaluationContextProvider) {
-		super(queryMethod, elasticsearchOperations, evaluationContextProvider);
+			ValueExpressionDelegate valueExpressionDelegate) {
+		super(queryMethod, elasticsearchOperations,
+				valueExpressionDelegate.createValueContextProvider(queryMethod.getParameters()));
 
 		ResultProcessor processor = queryMethod.getResultProcessor();
 		this.tree = new PartTree(queryMethod.getName(), processor.getReturnedType().getDomainType());

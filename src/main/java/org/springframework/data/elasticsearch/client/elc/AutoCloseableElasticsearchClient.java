@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2024 the original author or authors.
+ * Copyright 2021-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,8 @@ package org.springframework.data.elasticsearch.client.elc;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.transport.ElasticsearchTransport;
+
+import java.io.IOException;
 
 import org.elasticsearch.client.RestClient;
 import org.springframework.util.Assert;
@@ -36,7 +38,10 @@ public class AutoCloseableElasticsearchClient extends ElasticsearchClient implem
 	}
 
 	@Override
-	public void close() throws Exception {
-		transport.close();
+	public void close() throws IOException {
+		// since Elasticsearch 8.16 the ElasticsearchClient implements (through ApiClient) the Closeable interface and
+		// handles closing of the underlying transport. We now just call the base class, but keep this as we
+		// have been implementing AutoCloseable since 4.4 and won't change that to a mere Closeable
+		super.close();
 	}
 }

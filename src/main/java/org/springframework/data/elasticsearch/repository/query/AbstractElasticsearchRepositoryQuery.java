@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2024 the original author or authors.
+ * Copyright 2013-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,9 +24,10 @@ import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
 import org.springframework.data.elasticsearch.core.query.BaseQuery;
 import org.springframework.data.elasticsearch.core.query.DeleteQuery;
 import org.springframework.data.elasticsearch.core.query.Query;
+import org.springframework.data.elasticsearch.core.query.SearchTemplateQuery;
+import org.springframework.data.expression.ValueEvaluationContextProvider;
 import org.springframework.data.repository.query.ParametersParameterAccessor;
 import org.springframework.data.repository.query.QueryMethod;
-import org.springframework.data.repository.query.QueryMethodEvaluationContextProvider;
 import org.springframework.data.repository.query.RepositoryQuery;
 import org.springframework.data.repository.query.ResultProcessor;
 import org.springframework.data.util.StreamUtils;
@@ -49,11 +50,11 @@ public abstract class AbstractElasticsearchRepositoryQuery implements Repository
 	protected ElasticsearchQueryMethod queryMethod;
 	protected final ElasticsearchOperations elasticsearchOperations;
 	protected final ElasticsearchConverter elasticsearchConverter;
-	protected final QueryMethodEvaluationContextProvider evaluationContextProvider;
+	protected final ValueEvaluationContextProvider evaluationContextProvider;
 
 	public AbstractElasticsearchRepositoryQuery(ElasticsearchQueryMethod queryMethod,
 			ElasticsearchOperations elasticsearchOperations,
-			QueryMethodEvaluationContextProvider evaluationContextProvider) {
+			ValueEvaluationContextProvider evaluationContextProvider) {
 
 		Assert.notNull(queryMethod, "queryMethod must not be null");
 		Assert.notNull(elasticsearchOperations, "elasticsearchOperations must not be null");
@@ -114,11 +115,15 @@ public abstract class AbstractElasticsearchRepositoryQuery implements Repository
 					: PageRequest.of(0, DEFAULT_STREAM_BATCH_SIZE));
 			result = StreamUtils.createStreamFromIterator(elasticsearchOperations.searchForStream(query, clazz, index));
 		} else if (queryMethod.isCollectionQuery()) {
-			if (parameterAccessor.getPageable().isUnpaged()) {
-				int itemCount = (int) elasticsearchOperations.count(query, clazz, index);
-				query.setPageable(PageRequest.of(0, Math.max(1, itemCount)));
+			if (query instanceof SearchTemplateQuery) {
+				// we cannot get a count here, from and size would be in the template
 			} else {
-				query.setPageable(parameterAccessor.getPageable());
+				if (parameterAccessor.getPageable().isUnpaged()) {
+					int itemCount = (int) elasticsearchOperations.count(query, clazz, index);
+					query.setPageable(PageRequest.of(0, Math.max(1, itemCount)));
+				} else {
+					query.setPageable(parameterAccessor.getPageable());
+				}
 			}
 			result = elasticsearchOperations.search(query, clazz, index);
 		} else {
@@ -137,7 +142,8 @@ public abstract class AbstractElasticsearchRepositoryQuery implements Repository
 		var query = createQuery(parameterAccessor);
 		Assert.notNull(query, "unsupported query");
 
-		queryMethod.addMethodParameter(query, parameterAccessor, elasticsearchOperations.getElasticsearchConverter(),
+		queryMethod.addSpecialMethodParameters(query, parameterAccessor,
+				elasticsearchOperations.getElasticsearchConverter(),
 				evaluationContextProvider);
 
 		return query;

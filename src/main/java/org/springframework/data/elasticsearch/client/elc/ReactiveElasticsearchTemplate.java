@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2024 the original author or authors.
+ * Copyright 2021-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -57,18 +57,12 @@ import org.springframework.data.elasticsearch.core.document.Document;
 import org.springframework.data.elasticsearch.core.document.SearchDocument;
 import org.springframework.data.elasticsearch.core.document.SearchDocumentResponse;
 import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
-import org.springframework.data.elasticsearch.core.query.BaseQuery;
-import org.springframework.data.elasticsearch.core.query.BaseQueryBuilder;
-import org.springframework.data.elasticsearch.core.query.BulkOptions;
-import org.springframework.data.elasticsearch.core.query.ByQueryResponse;
-import org.springframework.data.elasticsearch.core.query.DeleteQuery;
-import org.springframework.data.elasticsearch.core.query.Query;
-import org.springframework.data.elasticsearch.core.query.SearchTemplateQuery;
-import org.springframework.data.elasticsearch.core.query.UpdateQuery;
+import org.springframework.data.elasticsearch.core.query.*;
 import org.springframework.data.elasticsearch.core.query.UpdateResponse;
 import org.springframework.data.elasticsearch.core.reindex.ReindexRequest;
 import org.springframework.data.elasticsearch.core.reindex.ReindexResponse;
 import org.springframework.data.elasticsearch.core.script.Script;
+import org.springframework.data.elasticsearch.core.sql.SqlResponse;
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
@@ -88,6 +82,7 @@ public class ReactiveElasticsearchTemplate extends AbstractReactiveElasticsearch
 	private static final Log LOGGER = LogFactory.getLog(ReactiveElasticsearchTemplate.class);
 
 	private final ReactiveElasticsearchClient client;
+	private final ReactiveElasticsearchSqlClient sqlClient;
 	private final RequestConverter requestConverter;
 	private final ResponseConverter responseConverter;
 	private final JsonpMapper jsonpMapper;
@@ -99,6 +94,7 @@ public class ReactiveElasticsearchTemplate extends AbstractReactiveElasticsearch
 		Assert.notNull(client, "client must not be null");
 
 		this.client = client;
+		this.sqlClient = client.sql();
 		this.jsonpMapper = client._transport().jsonpMapper();
 		requestConverter = new RequestConverter(converter, jsonpMapper);
 		responseConverter = new ResponseConverter(jsonpMapper);
@@ -169,16 +165,6 @@ public class ReactiveElasticsearchTemplate extends AbstractReactiveElasticsearch
 				((ClientCallback<Publisher<BooleanResponse>>) client -> client.exists(existsRequest))))
 				.map(BooleanResponse::value) //
 				.onErrorReturn(NoSuchIndexException.class, false);
-	}
-
-	@Override
-	public Mono<ByQueryResponse> delete(Query query, Class<?> entityType, IndexCoordinates index) {
-
-		Assert.notNull(query, "query must not be null");
-
-		DeleteByQueryRequest request = requestConverter.documentDeleteByQueryRequest(query, routingResolver.getRouting(),
-				entityType, index, getRefreshPolicy());
-		return Mono.from(execute(client -> client.deleteByQuery(request))).map(responseConverter::byQueryResponse);
 	}
 
 	@Override
@@ -395,7 +381,28 @@ public class ReactiveElasticsearchTemplate extends AbstractReactiveElasticsearch
 			Function<PitSearchAfter, Publisher<? extends ResponseBody<EntityAsMap>>> resourceClosure = psa -> {
 
 				baseQuery.setPointInTime(new Query.PointInTime(psa.getPit(), pitKeepAlive));
-				baseQuery.addSort(Sort.by("_shard_doc"));
+
+				// only add _shard_doc if there is not a field_collapse and a sort with the same name
+				boolean addShardDoc = true;
+
+				if (query instanceof NativeQuery nativeQuery && nativeQuery.getFieldCollapse() != null) {
+					var field = nativeQuery.getFieldCollapse().field();
+
+					if (nativeQuery.getSortOptions().stream()
+							.anyMatch(sortOptions -> sortOptions.isField() && sortOptions.field().field().equals(field))) {
+						addShardDoc = false;
+					}
+
+					if (query.getSort() != null
+							&& query.getSort().stream().anyMatch(order -> order.getProperty().equals(field))) {
+						addShardDoc = false;
+					}
+				}
+
+				if (addShardDoc) {
+					baseQuery.addSort(Sort.by("_shard_doc"));
+				}
+
 				SearchRequest firstSearchRequest = requestConverter.searchRequest(baseQuery, routingResolver.getRouting(),
 						clazz, index, false, true);
 
@@ -623,6 +630,14 @@ public class ReactiveElasticsearchTemplate extends AbstractReactiveElasticsearch
 	@Override
 	public BaseQueryBuilder queryBuilderWithIds(List<String> ids) {
 		return NativeQuery.builder().withIds(ids);
+	}
+
+	@Override
+	public Mono<SqlResponse> search(SqlQuery query) {
+		Assert.notNull(query, "Query must not be null.");
+
+		co.elastic.clients.elasticsearch.sql.QueryRequest request = requestConverter.sqlQueryRequest(query);
+		return sqlClient.query(request).onErrorMap(this::translateException).map(responseConverter::sqlResponse);
 	}
 
 	/**

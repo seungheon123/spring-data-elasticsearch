@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2024 the original author or authors.
+ * Copyright 2013-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,6 +37,8 @@ import org.springframework.core.annotation.AliasFor;
  * @author Brian Kimmig
  * @author Morgan Lutz
  * @author Sascha Woo
+ * @author Haibo Liu
+ * @author Andriy Redko
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ ElementType.FIELD, ElementType.ANNOTATION_TYPE, ElementType.METHOD })
@@ -128,6 +130,10 @@ public @interface Field {
 	boolean norms() default true;
 
 	/**
+	 * NOte that null_value setting are not supported in Elasticsearch for all types. For example setting a null_value on
+	 * a field with type text will throw an exception in the server when the mapping is written to Elasticsearch. Alas,
+	 * the Elasticsearch documentation does not specify on which types it is allowed on which it is not.
+	 *
 	 * @since 4.0
 	 */
 	String nullValue() default "";
@@ -196,6 +202,27 @@ public @interface Field {
 	int dims() default -1;
 
 	/**
+	 * to be used in combination with {@link FieldType#Dense_Vector}
+	 *
+	 * @since 5.4
+	 */
+	String elementType() default FieldElementType.DEFAULT;
+
+	/**
+	 * to be used in combination with {@link FieldType#Dense_Vector}
+	 *
+	 * @since 5.4
+	 */
+	KnnSimilarity knnSimilarity() default KnnSimilarity.DEFAULT;
+
+	/**
+	 * to be used in combination with {@link FieldType#Dense_Vector}
+	 *
+	 * @since 5.4
+	 */
+	KnnIndexOptions[] knnIndexOptions() default {};
+
+	/**
 	 * Controls how Elasticsearch dynamically adds fields to the inner object within the document.<br>
 	 * To be used in combination with {@link FieldType#Object} or {@link FieldType#Nested}
 	 *
@@ -218,4 +245,11 @@ public @interface Field {
 	 * @since 5.1
 	 */
 	boolean storeEmptyValue() default true;
+
+	/**
+	 * overrides the field type in the mapping which otherwise will be taken from corresponding {@link FieldType}
+	 *
+	 * @since 5.4
+	 */
+	String mappedTypeName() default "";
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2024 the original author or authors.
+ * Copyright 2021-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,6 +50,7 @@ import org.springframework.util.Assert;
  *
  * @author Peter-Josef Meisch
  * @author Haibo Liu
+ * @author Mohamed El Harrougui
  * @since 4.4
  */
 final class DocumentAdapters {
@@ -74,7 +75,7 @@ final class DocumentAdapters {
 		Map<String, SearchDocumentResponse> innerHits = new LinkedHashMap<>();
 		hit.innerHits().forEach((name, innerHitsResult) -> {
 			// noinspection ReturnOfNull
-			innerHits.put(name, SearchDocumentResponseBuilder.from(innerHitsResult.hits(), null, null, null, null, null,
+			innerHits.put(name, SearchDocumentResponseBuilder.from(innerHitsResult.hits(), null, null, null, 0, null, null,
 					searchDocument -> null, jsonpMapper));
 		});
 

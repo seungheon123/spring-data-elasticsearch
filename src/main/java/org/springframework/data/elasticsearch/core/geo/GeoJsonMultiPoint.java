@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2024 the original author or authors.
+ * Copyright 2015-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -69,7 +69,7 @@ public class GeoJsonMultiPoint implements GeoJson<Iterable<Point>> {
 		Assert.notNull(second, "Second point must not be null!");
 		Assert.notNull(others, "Additional points must not be null!");
 
-		List<Point> points = new ArrayList<>();
+		List<Point> points = new ArrayList<>(2 + others.length);
 		points.add(first);
 		points.add(second);
 		points.addAll(Arrays.asList(others));
@@ -103,7 +103,7 @@ public class GeoJsonMultiPoint implements GeoJson<Iterable<Point>> {
 		Assert.notNull(second, "Second point must not be null!");
 		Assert.notNull(others, "Additional points must not be null!");
 
-		List<Point> points = new ArrayList<>();
+		List<Point> points = new ArrayList<>(2 + others.length);
 		points.add(GeoPoint.toPoint(first));
 		points.add(GeoPoint.toPoint(second));
 		points.addAll(Arrays.stream(others).map(GeoPoint::toPoint).collect(Collectors.toList()));

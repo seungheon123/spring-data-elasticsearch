@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2024 the original author or authors.
+ * Copyright 2019-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -296,12 +296,6 @@ public abstract class AbstractElasticsearchTemplate implements ElasticsearchOper
 		Assert.notNull(entityType, "entityType must not be null");
 
 		return this.delete(id, getIndexCoordinatesFor(entityType));
-	}
-
-	@Override
-	@Deprecated
-	public ByQueryResponse delete(Query query, Class<?> clazz) {
-		return delete(query, clazz, getIndexCoordinatesFor(clazz));
 	}
 
 	@Override

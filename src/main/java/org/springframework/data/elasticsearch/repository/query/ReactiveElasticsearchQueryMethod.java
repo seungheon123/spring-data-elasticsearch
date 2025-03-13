@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2024 the original author or authors.
+ * Copyright 2019-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package org.springframework.data.elasticsearch.repository.query;
-
-import static org.springframework.data.repository.util.ClassUtils.*;
 
 import reactor.core.publisher.Mono;
 
@@ -36,6 +34,7 @@ import org.springframework.data.repository.core.RepositoryMetadata;
 import org.springframework.data.repository.util.ReactiveWrapperConverters;
 import org.springframework.data.util.Lazy;
 import org.springframework.data.util.ReactiveWrappers;
+import org.springframework.data.util.ReflectionUtils;
 import org.springframework.data.util.TypeInformation;
 import org.springframework.util.ClassUtils;
 
@@ -55,7 +54,7 @@ public class ReactiveElasticsearchQueryMethod extends ElasticsearchQueryMethod {
 
 		super(method, metadata, factory, mappingContext);
 
-		if (hasParameterOfType(method, Pageable.class)) {
+		if (ReflectionUtils.hasParameterOfType(method, Pageable.class)) {
 
 			TypeInformation<?> returnType = TypeInformation.fromReturnTypeOf(method);
 			boolean multiWrapper = ReactiveWrappers.isMultiValueType(returnType.getType());
@@ -75,7 +74,7 @@ public class ReactiveElasticsearchQueryMethod extends ElasticsearchQueryMethod {
 						method));
 			}
 
-			if (hasParameterOfType(method, Sort.class)) {
+			if (ReflectionUtils.hasParameterOfType(method, Sort.class)) {
 				throw new IllegalStateException(String.format("Method must not have Pageable *and* Sort parameter. "
 						+ "Use sorting capabilities on Pageable instead! Offending method: %s", method));
 			}

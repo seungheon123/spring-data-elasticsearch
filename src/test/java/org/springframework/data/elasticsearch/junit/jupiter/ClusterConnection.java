@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2024 the original author or authors.
+ * Copyright 2019-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -129,10 +129,13 @@ public class ClusterConnection implements ExtensionContext.Store.CloseableResour
 			Map<String, String> testcontainersProperties = testcontainersProperties(
 					"testcontainers-" + testcontainersConfiguration + ".properties");
 
+			var testcontainersPropertiesLocal = testcontainersProperties("testcontainers-local.properties");
+			testcontainersProperties.putAll(testcontainersPropertiesLocal);
+
 			DockerImageName dockerImageName = getDockerImageName(testcontainersProperties);
 
 			ElasticsearchContainer elasticsearchContainer = new SpringDataElasticsearchContainer(dockerImageName)
-					.withEnv(testcontainersProperties).withStartupTimeout(Duration.ofMinutes(2));
+					.withEnv(testcontainersProperties).withStartupTimeout(Duration.ofMinutes(2)).withReuse(true);
 			elasticsearchContainer.start();
 
 			return ClusterConnectionInfo.builder() //
@@ -192,16 +195,7 @@ public class ClusterConnection implements ExtensionContext.Store.CloseableResour
 	@Override
 	public void close() {
 
-		if (clusterConnectionInfo != null && clusterConnectionInfo.getElasticsearchContainer() != null) {
-			if (LOGGER.isDebugEnabled()) {
-				LOGGER.debug("Stopping container");
-			}
-			clusterConnectionInfo.getElasticsearchContainer().stop();
-		}
 
-		if (LOGGER.isDebugEnabled()) {
-			LOGGER.debug("closed");
-		}
 	}
 
 	private static class SpringDataElasticsearchContainer extends ElasticsearchContainer {

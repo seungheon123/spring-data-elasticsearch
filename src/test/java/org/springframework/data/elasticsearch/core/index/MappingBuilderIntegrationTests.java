@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2024 the original author or authors.
+ * Copyright 2013-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -58,6 +58,8 @@ import org.springframework.lang.Nullable;
  * @author Roman Puchkovskiy
  * @author Brian Kimmig
  * @author Morgan Lutz
+ * @author Haibo Liu
+ * @author Andriy Redko
  */
 @SpringIntegrationTest
 public abstract class MappingBuilderIntegrationTests extends MappingContextBaseTests {
@@ -74,6 +76,12 @@ public abstract class MappingBuilderIntegrationTests extends MappingContextBaseT
 	@Order(java.lang.Integer.MAX_VALUE)
 	void cleanup() {
 		operations.indexOps(IndexCoordinates.of(indexNameProvider.getPrefix() + "*")).delete();
+	}
+
+	@Test
+	public void shouldSupportAllTypes() {
+		IndexOperations indexOperations = operations.indexOps(EntityWithAllTypes.class);
+		indexOperations.createWithMapping();
 	}
 
 	@Test
@@ -908,7 +916,7 @@ public abstract class MappingBuilderIntegrationTests extends MappingContextBaseT
 		@Nullable
 		@Id private String id;
 
-		@Field(type = FieldType.Dense_Vector, dims = 42, similarity = "cosine") private double[] denseVector;
+		@Field(type = FieldType.Dense_Vector, dims = 42, knnSimilarity = KnnSimilarity.COSINE) private double[] denseVector;
 	}
 
 	@Mapping(aliases = {

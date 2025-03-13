@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2024 the original author or authors.
+ * Copyright 2013-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 package org.springframework.data.elasticsearch.core.mapping;
+
+import java.util.Set;
 
 import org.springframework.data.elasticsearch.annotations.Document;
 import org.springframework.data.elasticsearch.annotations.Dynamic;
@@ -42,6 +44,14 @@ public interface ElasticsearchPersistentEntity<T> extends PersistentEntity<T, El
 
 	IndexCoordinates getIndexCoordinates();
 
+	/**
+	 * Retrieves the aliases associated with the current entity.
+	 *
+	 * @return Returns a set of aliases of the {@link PersistentEntity}.
+	 * @since 5.4
+	 */
+	Set<Alias> getAliases();
+
 	short getShards();
 
 	short getReplicas();
@@ -66,7 +76,7 @@ public interface ElasticsearchPersistentEntity<T> extends PersistentEntity<T, El
 	boolean isCreateIndexAndMapping();
 
 	/**
-	 * returns the {@link ElasticsearchPersistentProperty} with the given fieldName (may be set by the {@link Field}
+	 * returns the {@link ElasticsearchPersistentProperty} with the given fieldName (can be set by the {@link Field})
 	 * annotation.
 	 *
 	 * @param fieldName to field name for the search, must not be {@literal null}
@@ -189,7 +199,7 @@ public interface ElasticsearchPersistentEntity<T> extends PersistentEntity<T, El
 	boolean storeVersionInSource();
 
 	/**
-	 * @return if the mapping should be written to the index on repositry bootstrap even if the index already exists.
+	 * @return if the mapping should be written to the index on repository bootstrap even if the index already exists.
 	 * @since 5.2
 	 */
 	boolean isAlwaysWriteMapping();

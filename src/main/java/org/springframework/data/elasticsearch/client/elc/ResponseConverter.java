@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2024 the original author or authors.
+ * Copyright 2021-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,6 +33,8 @@ import co.elastic.clients.elasticsearch.core.mget.MultiGetResponseItem;
 import co.elastic.clients.elasticsearch.indices.*;
 import co.elastic.clients.elasticsearch.indices.get_index_template.IndexTemplateItem;
 import co.elastic.clients.elasticsearch.indices.get_mapping.IndexMappingRecord;
+import co.elastic.clients.elasticsearch.sql.QueryResponse;
+import co.elastic.clients.json.JsonData;
 import co.elastic.clients.json.JsonpMapper;
 
 import java.util.ArrayList;
@@ -61,6 +63,7 @@ import org.springframework.data.elasticsearch.core.query.ByQueryResponse;
 import org.springframework.data.elasticsearch.core.query.StringQuery;
 import org.springframework.data.elasticsearch.core.reindex.ReindexResponse;
 import org.springframework.data.elasticsearch.core.script.Script;
+import org.springframework.data.elasticsearch.core.sql.SqlResponse;
 import org.springframework.data.elasticsearch.support.DefaultStringObjectMap;
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
@@ -535,6 +538,29 @@ class ResponseConverter {
 				: null;
 	}
 	// endregion
+
+	// region sql
+	public SqlResponse sqlResponse(QueryResponse response) {
+		SqlResponse.Builder builder = SqlResponse.builder();
+		builder.withRunning(Boolean.TRUE.equals(response.isRunning()))
+				.withPartial(Boolean.TRUE.equals(response.isPartial())).withCursor(response.cursor());
+
+		final List<SqlResponse.Column> columns = response.columns().stream()
+				.map(column -> new SqlResponse.Column(column.name(), column.type())).toList();
+		builder.withColumns(columns);
+
+		for (List<JsonData> rowValues : response.rows()) {
+			SqlResponse.Row.Builder rowBuilder = SqlResponse.Row.builder();
+			for (int idx = 0; idx < rowValues.size(); idx++) {
+				rowBuilder.withValue(columns.get(idx), rowValues.get(idx).toJson());
+			}
+
+			builder.withRow(rowBuilder.build());
+		}
+
+		return builder.build();
+	}
+	// end region
 
 	// region helper functions
 

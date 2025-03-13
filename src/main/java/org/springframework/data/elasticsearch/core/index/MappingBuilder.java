@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2024 the original author or authors.
+ * Copyright 2014-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -69,6 +69,7 @@ import com.fasterxml.jackson.databind.util.RawValue;
  * @author Peter-Josef Meisch
  * @author Xiao Yu
  * @author Subhobrata Dey
+ * @author Andriy Redko
  */
 public class MappingBuilder {
 
@@ -175,7 +176,9 @@ public class MappingBuilder {
 						.findAnnotation(org.springframework.data.elasticsearch.annotations.Document.class);
 				var dynamicMapping = docAnnotation != null ? docAnnotation.dynamic() : null;
 
-				mapEntity(objectNode, entity, true, "", false, FieldType.Auto, null, dynamicMapping, runtimeFields);
+				final FieldType fieldType = FieldType.Auto;
+				mapEntity(objectNode, entity, true, "", false, fieldType, fieldType.getMappedName(), null, dynamicMapping,
+						runtimeFields);
 
 				if (!excludeFromSource.isEmpty()) {
 					ObjectNode sourceNode = objectNode.putObject(SOURCE);
@@ -211,6 +214,7 @@ public class MappingBuilder {
 
 		private void mapEntity(ObjectNode objectNode, @Nullable ElasticsearchPersistentEntity<?> entity,
 				boolean isRootObject, String nestedObjectFieldName, boolean nestedOrObjectField, FieldType fieldType,
+				String fieldTypeMappedName,
 				@Nullable Field parentFieldAnnotation, @Nullable Dynamic dynamicMapping, @Nullable Document runtimeFields)
 				throws IOException {
 
@@ -244,7 +248,7 @@ public class MappingBuilder {
 			boolean writeNestedProperties = !isRootObject && (isAnyPropertyAnnotatedWithField(entity) || nestedOrObjectField);
 			if (writeNestedProperties) {
 
-				String type = nestedOrObjectField ? fieldType.getMappedName() : FieldType.Object.getMappedName();
+				String type = nestedOrObjectField ? fieldTypeMappedName : FieldType.Object.getMappedName();
 
 				ObjectNode nestedObjectNode = objectMapper.createObjectNode();
 				nestedObjectNode.put(FIELD_PARAM_TYPE, type);
@@ -345,8 +349,10 @@ public class MappingBuilder {
 					: nestedPropertyPrefix + '.' + property.getFieldName();
 
 			Field fieldAnnotation = property.findAnnotation(Field.class);
+			MultiField multiFieldAnnotation = property.findAnnotation(MultiField.class);
 
-			if (fieldAnnotation != null && fieldAnnotation.excludeFromSource()) {
+			if ((fieldAnnotation != null && fieldAnnotation.excludeFromSource()) ||
+					multiFieldAnnotation != null && multiFieldAnnotation.mainField().excludeFromSource()) {
 				excludeFromSource.add(nestedPropertyPath);
 			}
 
@@ -370,14 +376,12 @@ public class MappingBuilder {
 					nestedPropertyPrefix = nestedPropertyPath;
 
 					mapEntity(propertiesNode, persistentEntity, false, property.getFieldName(), true, fieldAnnotation.type(),
-							fieldAnnotation, dynamicMapping, null);
+							getMappedTypeName(fieldAnnotation), fieldAnnotation, dynamicMapping, null);
 
 					nestedPropertyPrefix = currentNestedPropertyPrefix;
 					return;
 				}
 			}
-
-			MultiField multiField = property.findAnnotation(MultiField.class);
 
 			if (isCompletionProperty) {
 				CompletionField completionField = property.findAnnotation(CompletionField.class);
@@ -386,8 +390,8 @@ public class MappingBuilder {
 
 			if (isRootObject && fieldAnnotation != null && property.isIdProperty()) {
 				applyDefaultIdFieldMapping(propertiesNode, property);
-			} else if (multiField != null) {
-				addMultiFieldMapping(propertiesNode, property, multiField, isNestedOrObjectProperty, dynamicMapping);
+			} else if (multiFieldAnnotation != null) {
+				addMultiFieldMapping(propertiesNode, property, multiFieldAnnotation, isNestedOrObjectProperty, dynamicMapping);
 			} else if (fieldAnnotation != null) {
 				addSingleFieldMapping(propertiesNode, property, fieldAnnotation, isNestedOrObjectProperty, dynamicMapping);
 			}
@@ -473,13 +477,23 @@ public class MappingBuilder {
 				}
 
 				propertiesNode.set(property.getFieldName(), objectMapper.createObjectNode() //
-						.put(FIELD_PARAM_TYPE, field.type().getMappedName()) //
+						.put(FIELD_PARAM_TYPE, getMappedTypeName(field)) //
 						.put(MAPPING_ENABLED, false) //
 				);
 
 			} catch (Exception e) {
 				throw new MappingException("Could not write enabled: false mapping for " + property.getFieldName(), e);
 			}
+		}
+
+		/**
+		 * Return the mapping type name to be used for the {@link Field}
+		 *
+		 * @param field field to return the mapping type name for
+		 * @return the mapping type name
+		 */
+		private String getMappedTypeName(Field field) {
+			return StringUtils.hasText(field.mappedTypeName()) ? field.mappedTypeName() : field.type().getMappedName();
 		}
 
 		/**

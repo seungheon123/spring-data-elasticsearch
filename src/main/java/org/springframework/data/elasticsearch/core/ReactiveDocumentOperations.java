@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2024 the original author or authors.
+ * Copyright 2019-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -332,32 +332,9 @@ public interface ReactiveDocumentOperations {
 	 * @param query must not be {@literal null}.
 	 * @param entityType must not be {@literal null}.
 	 * @return a {@link Mono} emitting the number of the removed documents.
-	 * @deprecated since 5.3.0, use {@link #delete(DeleteQuery, Class)}
-	 */
-	@Deprecated
-	Mono<ByQueryResponse> delete(Query query, Class<?> entityType);
-
-	/**
-	 * Delete the documents matching the given {@link Query} extracting index from entity metadata.
-	 *
-	 * @param query must not be {@literal null}.
-	 * @param entityType must not be {@literal null}.
-	 * @return a {@link Mono} emitting the number of the removed documents.
 	 * @since 5.3
 	 */
 	Mono<ByQueryResponse> delete(DeleteQuery query, Class<?> entityType);
-
-	/**
-	 * Delete the documents matching the given {@link Query} extracting index from entity metadata.
-	 *
-	 * @param query must not be {@literal null}.
-	 * @param entityType must not be {@literal null}.
-	 * @param index the target index, must not be {@literal null}
-	 * @return a {@link Mono} emitting the number of the removed documents.
-	 * @deprecated since 5.3.0, use {@link #delete(DeleteQuery, Class, IndexCoordinates)}
-	 */
-	@Deprecated
-	Mono<ByQueryResponse> delete(Query query, Class<?> entityType, IndexCoordinates index);
 
 	/**
 	 * Delete the documents matching the given {@link Query} extracting index from entity metadata.

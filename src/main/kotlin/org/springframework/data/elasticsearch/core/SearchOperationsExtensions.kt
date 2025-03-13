@@ -1,5 +1,5 @@
 /*
- * Copyright 2023-2024 the original author or authors.
+ * Copyright 2023-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,11 +33,11 @@ inline fun <reified T : Any> SearchOperations.searchOne(query: Query): SearchHit
 inline fun <reified T : Any> SearchOperations.searchOne(query: Query, index: IndexCoordinates): SearchHit<T>? =
     searchOne(query, T::class.java, index)
 
-inline fun <reified T : Any> SearchOperations.multiSearch(queries: List<out Query>): List<SearchHits<T>> =
+inline fun <reified T : Any> SearchOperations.multiSearch(queries: List<Query>): List<SearchHits<T>> =
     multiSearch(queries, T::class.java)
 
 inline fun <reified T : Any> SearchOperations.multiSearch(
-    queries: List<out Query>,
+    queries: List<Query>,
     index: IndexCoordinates
 ): List<SearchHits<T>> =
     multiSearch(queries, T::class.java, index)

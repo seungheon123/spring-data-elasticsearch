@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2024 the original author or authors.
+ * Copyright 2013-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import org.springframework.data.elasticsearch.core.convert.ElasticsearchConverte
 import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
 import org.springframework.data.elasticsearch.core.routing.RoutingResolver;
 import org.springframework.data.elasticsearch.core.script.ScriptOperations;
+import org.springframework.data.elasticsearch.core.sql.SqlOperations;
 import org.springframework.lang.Nullable;
 
 /**
@@ -35,7 +36,7 @@ import org.springframework.lang.Nullable;
  * @author Dmitriy Yakovlev
  * @author Peter-Josef Meisch
  */
-public interface ElasticsearchOperations extends DocumentOperations, SearchOperations, ScriptOperations {
+public interface ElasticsearchOperations extends DocumentOperations, SearchOperations, ScriptOperations, SqlOperations {
 
 	/**
 	 * get an {@link IndexOperations} that is bound to the given class

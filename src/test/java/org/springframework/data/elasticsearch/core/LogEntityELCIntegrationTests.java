@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2024 the original author or authors.
+ * Copyright 2021-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -54,12 +54,13 @@ public class LogEntityELCIntegrationTests extends LogEntityIntegrationTests {
 
 	@Override
 	Query rangeQueryForIp(String from, String to) {
-		return NativeQuery.builder() //
-				.withQuery(qb -> qb //
-						.range(rqb -> rqb //
-								.field("ip") //
-								.gte(JsonData.of(from))//
-								.lte(JsonData.of(to))//
-						)).build();
+		return NativeQuery.builder()
+				.withQuery(qb -> qb
+						.range(rqb -> rqb
+								.untyped(ut -> ut
+										.field("ip")
+										.gte(JsonData.of(from))
+										.lte(JsonData.of(to)))))
+				.build();
 	}
 }

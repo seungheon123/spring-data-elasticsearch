@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2024 the original author or authors.
+ * Copyright 2013-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,13 +15,8 @@
  */
 package org.springframework.data.elasticsearch.repository.query;
 
-import org.springframework.core.convert.ConversionService;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
-import org.springframework.data.elasticsearch.core.query.BaseQuery;
-import org.springframework.data.elasticsearch.core.query.StringQuery;
-import org.springframework.data.elasticsearch.repository.support.QueryStringProcessor;
-import org.springframework.data.repository.query.QueryMethodEvaluationContextProvider;
-import org.springframework.util.Assert;
+import org.springframework.data.repository.query.ValueExpressionDelegate;
 
 /**
  * ElasticsearchStringQuery
@@ -32,43 +27,12 @@ import org.springframework.util.Assert;
  * @author Taylor Ono
  * @author Peter-Josef Meisch
  * @author Haibo Liu
+ * @deprecated since 5.5, use {@link RepositoryStringQuery}
  */
-public class ElasticsearchStringQuery extends AbstractElasticsearchRepositoryQuery {
-
-	private final String queryString;
-
+@Deprecated(since = "5.5", forRemoval = true)
+public class ElasticsearchStringQuery extends RepositoryStringQuery {
 	public ElasticsearchStringQuery(ElasticsearchQueryMethod queryMethod, ElasticsearchOperations elasticsearchOperations,
-			String queryString, QueryMethodEvaluationContextProvider evaluationContextProvider) {
-		super(queryMethod, elasticsearchOperations, evaluationContextProvider);
-
-		Assert.notNull(queryString, "Query cannot be empty");
-		Assert.notNull(evaluationContextProvider, "ExpressionEvaluationContextProvider must not be null");
-
-		this.queryString = queryString;
+			String queryString, ValueExpressionDelegate valueExpressionDelegate) {
+		super(queryMethod, elasticsearchOperations, queryString, valueExpressionDelegate);
 	}
-
-	@Override
-	public boolean isCountQuery() {
-		return queryMethod.hasCountQueryAnnotation();
-	}
-
-	@Override
-	protected boolean isDeleteQuery() {
-		return false;
-	}
-
-	@Override
-	protected boolean isExistsQuery() {
-		return false;
-	}
-
-	protected BaseQuery createQuery(ElasticsearchParametersParameterAccessor parameterAccessor) {
-		ConversionService conversionService = elasticsearchOperations.getElasticsearchConverter().getConversionService();
-		var processed = new QueryStringProcessor(queryString, queryMethod, conversionService, evaluationContextProvider)
-				.createQuery(parameterAccessor);
-
-		return new StringQuery(processed)
-				.addSort(parameterAccessor.getSort());
-	}
-
 }

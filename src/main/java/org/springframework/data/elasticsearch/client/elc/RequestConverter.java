@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2024 the original author or authors.
+ * Copyright 2021-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,6 @@ import static org.springframework.util.CollectionUtils.*;
 
 import co.elastic.clients.elasticsearch._types.Conflicts;
 import co.elastic.clients.elasticsearch._types.ExpandWildcard;
-import co.elastic.clients.elasticsearch._types.InlineScript;
 import co.elastic.clients.elasticsearch._types.NestedSortValue;
 import co.elastic.clients.elasticsearch._types.OpType;
 import co.elastic.clients.elasticsearch._types.SortOptions;
@@ -52,6 +51,7 @@ import co.elastic.clients.elasticsearch.indices.*;
 import co.elastic.clients.elasticsearch.indices.ExistsIndexTemplateRequest;
 import co.elastic.clients.elasticsearch.indices.ExistsRequest;
 import co.elastic.clients.elasticsearch.indices.update_aliases.Action;
+import co.elastic.clients.elasticsearch.sql.query.SqlFormat;
 import co.elastic.clients.json.JsonData;
 import co.elastic.clients.json.JsonpDeserializer;
 import co.elastic.clients.json.JsonpMapper;
@@ -68,6 +68,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -88,6 +89,8 @@ import org.springframework.data.elasticsearch.core.index.GetIndexTemplateRequest
 import org.springframework.data.elasticsearch.core.index.GetTemplateRequest;
 import org.springframework.data.elasticsearch.core.index.PutIndexTemplateRequest;
 import org.springframework.data.elasticsearch.core.index.PutTemplateRequest;
+import org.springframework.data.elasticsearch.core.mapping.Alias;
+import org.springframework.data.elasticsearch.core.mapping.CreateIndexSettings;
 import org.springframework.data.elasticsearch.core.mapping.ElasticsearchPersistentEntity;
 import org.springframework.data.elasticsearch.core.mapping.ElasticsearchPersistentProperty;
 import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
@@ -111,7 +114,6 @@ import org.springframework.util.StringUtils;
  * @author Haibo Liu
  * @since 4.4
  */
-@SuppressWarnings("ClassCanBeRecord")
 class RequestConverter extends AbstractQueryProcessor {
 
 	private static final Log LOGGER = LogFactory.getLog(RequestConverter.class);
@@ -170,7 +172,8 @@ class RequestConverter extends AbstractQueryProcessor {
 				}));
 	}
 
-	private Alias.Builder buildAlias(AliasActionParameters parameters, Alias.Builder aliasBuilder) {
+	private co.elastic.clients.elasticsearch.indices.Alias.Builder buildAlias(AliasActionParameters parameters,
+			co.elastic.clients.elasticsearch.indices.Alias.Builder aliasBuilder) {
 
 		if (parameters.getRouting() != null) {
 			aliasBuilder.routing(parameters.getRouting());
@@ -234,17 +237,25 @@ class RequestConverter extends AbstractQueryProcessor {
 		return new ExistsRequest.Builder().index(Arrays.asList(indexCoordinates.getIndexNames())).build();
 	}
 
-	public CreateIndexRequest indicesCreateRequest(IndexCoordinates indexCoordinates, Map<String, Object> settings,
-			@Nullable Document mapping) {
-
-		Assert.notNull(indexCoordinates, "indexCoordinates must not be null");
-		Assert.notNull(settings, "settings must not be null");
+	public CreateIndexRequest indicesCreateRequest(CreateIndexSettings indexSettings) {
+		Map<String, co.elastic.clients.elasticsearch.indices.Alias> aliases = new HashMap<>();
+		for (Alias alias : indexSettings.getAliases()) {
+			co.elastic.clients.elasticsearch.indices.Alias esAlias = co.elastic.clients.elasticsearch.indices.Alias
+					.of(ab -> ab.filter(getQuery(alias.getFilter(), null))
+							.routing(alias.getRouting())
+							.indexRouting(alias.getIndexRouting())
+							.searchRouting(alias.getSearchRouting())
+							.isHidden(alias.getHidden())
+							.isWriteIndex(alias.getWriteIndex()));
+			aliases.put(alias.getAlias(), esAlias);
+		}
 
 		// note: the new client does not support the index.storeType anymore
 		return new CreateIndexRequest.Builder() //
-				.index(indexCoordinates.getIndexName()) //
-				.settings(indexSettings(settings)) //
-				.mappings(typeMapping(mapping)) //
+				.index(indexSettings.getIndexCoordinates().getIndexName()) //
+				.aliases(aliases)
+				.settings(indexSettings(indexSettings.getSettings())) //
+				.mappings(typeMapping(indexSettings.getMapping())) //
 				.build();
 	}
 
@@ -399,7 +410,7 @@ class RequestConverter extends AbstractQueryProcessor {
 
 		if (putTemplateRequest.getSettings() != null) {
 			Map<String, JsonData> settings = getTemplateParams(putTemplateRequest.getSettings().entrySet());
-			builder.settings(settings);
+			builder.settings(sb -> sb.otherSettings(settings));
 		}
 
 		if (putTemplateRequest.getMappings() != null) {
@@ -518,6 +529,27 @@ class RequestConverter extends AbstractQueryProcessor {
 
 		return co.elastic.clients.elasticsearch.indices.GetTemplateRequest
 				.of(gtr -> gtr.name(getTemplateRequest.getTemplateName()).flatSettings(true));
+	}
+
+	public co.elastic.clients.elasticsearch.sql.QueryRequest sqlQueryRequest(SqlQuery query) {
+		Assert.notNull(query, "Query must not be null.");
+
+		return co.elastic.clients.elasticsearch.sql.QueryRequest.of(sqb -> sqb
+				.query(query.getQuery())
+				.catalog(query.getCatalog())
+				.columnar(query.getColumnar())
+				.cursor(query.getCursor())
+				.fetchSize(query.getFetchSize())
+				.fieldMultiValueLeniency(query.getFieldMultiValueLeniency())
+				.indexUsingFrozen(query.getIndexIncludeFrozen())
+				.keepAlive(time(query.getKeepAlive()))
+				.keepOnCompletion(query.getKeepOnCompletion())
+				.pageTimeout(time(query.getPageTimeout()))
+				.requestTimeout(time(query.getRequestTimeout()))
+				.waitForCompletionTimeout(time(query.getWaitForCompletionTimeout()))
+				.filter(getQuery(query.getFilter(), null))
+				.timeZone(Objects.toString(query.getTimeZone(), null))
+				.format(SqlFormat.Json));
 	}
 
 	// endregion
@@ -717,16 +749,12 @@ class RequestConverter extends AbstractQueryProcessor {
 			scriptData.params().forEach((key, value) -> params.put(key, JsonData.of(value, jsonpMapper)));
 		}
 		return co.elastic.clients.elasticsearch._types.Script.of(sb -> {
+			sb.lang(scriptData.language())
+					.params(params);
 			if (scriptData.type() == ScriptType.INLINE) {
-				sb.inline(is -> is //
-						.lang(scriptData.language()) //
-						.source(scriptData.script()) //
-						.params(params)); //
+				sb.source(scriptData.script());
 			} else if (scriptData.type() == ScriptType.STORED) {
-				sb.stored(ss -> ss //
-						.id(scriptData.script()) //
-						.params(params) //
-				);
+				sb.id(scriptData.script());
 			}
 			return sb;
 		});
@@ -898,7 +926,9 @@ class RequestConverter extends AbstractQueryProcessor {
 
 		ReindexRequest.Script script = reindexRequest.getScript();
 		if (script != null) {
-			builder.script(s -> s.inline(InlineScript.of(i -> i.lang(script.getLang()).source(script.getSource()))));
+			builder.script(sb -> sb
+					.lang(script.getLang())
+					.source(script.getSource()));
 		}
 
 		builder.timeout(time(reindexRequest.getTimeout())) //
@@ -1016,10 +1046,13 @@ class RequestConverter extends AbstractQueryProcessor {
 											order = sortField.order().jsonValue();
 										}
 
-										return sortField.field() + ":" + order;
+										return sortField.field() + ':' + order;
 									})
 									.collect(Collectors.toList()));
 				}
+			}
+			if (query.getRefresh() != null) {
+				dqb.refresh(query.getRefresh());
 			}
 			dqb.allowNoIndices(query.getAllowNoIndices())
 					.conflicts(conflicts(query.getConflicts()))
@@ -1051,21 +1084,15 @@ class RequestConverter extends AbstractQueryProcessor {
 				}
 
 				uqb.script(sb -> {
+					sb.lang(query.getLang()).params(params);
+
 					if (query.getScriptType() == ScriptType.INLINE) {
-						sb.inline(is -> is //
-								.lang(query.getLang()) //
-								.source(query.getScript()) //
-								.params(params)); //
+						sb.source(query.getScript()); //
 					} else if (query.getScriptType() == ScriptType.STORED) {
-						sb.stored(ss -> ss //
-								.id(query.getScript()) //
-								.params(params) //
-						);
+						sb.id(query.getScript());
 					}
 					return sb;
-				}
-
-				);
+				});
 			}
 
 			uqb //
@@ -1320,17 +1347,16 @@ class RequestConverter extends AbstractQueryProcessor {
 										String script = runtimeField.getScript();
 
 										if (script != null) {
-											rfb
-													.script(s -> s
-															.inline(is -> {
-																is.source(script);
+											rfb.script(s -> {
+												s.source(script);
 
-																if (runtimeField.getParams() != null) {
-																	is.params(TypeUtils.paramsMap(runtimeField.getParams()));
-																}
-																return is;
-															}));
+												if (runtimeField.getParams() != null) {
+													s.params(TypeUtils.paramsMap(runtimeField.getParams()));
+												}
+												return s;
+											});
 										}
+
 										return rfb;
 									});
 									runtimeMappings.put(runtimeField.getName(), esRuntimeField);
@@ -1367,7 +1393,7 @@ class RequestConverter extends AbstractQueryProcessor {
 	private Function<MultisearchHeader.Builder, ObjectBuilder<MultisearchHeader>> msearchHeaderBuilder(Query query,
 			IndexCoordinates index, @Nullable String routing) {
 		return h -> {
-			var searchType = (query instanceof NativeQuery nativeQuery && nativeQuery.getKnnQuery() != null) ? null
+			var searchType = (query instanceof NativeQuery nativeQuery && !isEmpty(nativeQuery.getKnnSearches())) ? null
 					: searchType(query.getSearchType());
 
 			h //
@@ -1399,7 +1425,7 @@ class RequestConverter extends AbstractQueryProcessor {
 
 		ElasticsearchPersistentEntity<?> persistentEntity = getPersistentEntity(clazz);
 
-		var searchType = (query instanceof NativeQuery nativeQuery && nativeQuery.getKnnQuery() != null) ? null
+		var searchType = (query instanceof NativeQuery nativeQuery && !isEmpty(nativeQuery.getKnnSearches())) ? null
 				: searchType(query.getSearchType());
 
 		builder //
@@ -1477,8 +1503,8 @@ class RequestConverter extends AbstractQueryProcessor {
 		if (query instanceof NativeQuery nativeQuery) {
 			prepareNativeSearch(nativeQuery, builder);
 		}
-		// query.getSort() must be checked after prepareNativeSearch as this already might hav a sort set that must have
-		// higher priority
+		// query.getSort() must be checked after prepareNativeSearch as this already might have a sort set
+		// that must have higher priority
 		if (query.getSort() != null) {
 			List<SortOptions> sortOptions = getSortOptions(query.getSort(), persistentEntity);
 
@@ -1500,7 +1526,15 @@ class RequestConverter extends AbstractQueryProcessor {
 		}
 
 		if (!isEmpty(query.getSearchAfter())) {
-			builder.searchAfter(query.getSearchAfter().stream().map(TypeUtils::toFieldValue).toList());
+			var fieldValues = query.getSearchAfter().stream().map(TypeUtils::toFieldValue).toList();
+
+			// when there is a field collapse on a native query, and we have a search_after, then the search_after
+			// must only have one entry
+			if (query instanceof NativeQuery nativeQuery && nativeQuery.getFieldCollapse() != null) {
+				builder.searchAfter(fieldValues.get(0));
+			} else {
+				builder.searchAfter(fieldValues);
+			}
 		}
 
 		query.getRescorerQueries().forEach(rescorerQuery -> builder.rescore(getRescore(rescorerQuery)));
@@ -1513,16 +1547,14 @@ class RequestConverter extends AbstractQueryProcessor {
 						rfb.type(RuntimeFieldType._DESERIALIZER.parse(runtimeField.getType()));
 						String script = runtimeField.getScript();
 						if (script != null) {
-							rfb
-									.script(s -> s
-											.inline(is -> {
-												is.source(script);
+							rfb.script(s -> {
+								s.source(script);
 
-												if (runtimeField.getParams() != null) {
-													is.params(TypeUtils.paramsMap(runtimeField.getParams()));
-												}
-												return is;
-											}));
+								if (runtimeField.getParams() != null) {
+									s.params(TypeUtils.paramsMap(runtimeField.getParams()));
+								}
+								return s;
+							});
 						}
 
 						return rfb;
@@ -1718,8 +1750,8 @@ class RequestConverter extends AbstractQueryProcessor {
 				.sort(query.getSortOptions()) //
 		;
 
-		if (query.getKnnQuery() != null) {
-			builder.knn(query.getKnnQuery());
+		if (!isEmpty(query.getKnnSearches())) {
+			builder.knn(query.getKnnSearches());
 		}
 
 		if (!isEmpty(query.getAggregations())) {
@@ -1739,8 +1771,8 @@ class RequestConverter extends AbstractQueryProcessor {
 				.collapse(query.getFieldCollapse()) //
 				.sort(query.getSortOptions());
 
-		if (query.getKnnQuery() != null) {
-			builder.knn(query.getKnnQuery());
+		if (!isEmpty(query.getKnnSearches())) {
+			builder.knn(query.getKnnSearches());
 		}
 
 		if (!isEmpty(query.getAggregations())) {
@@ -1758,7 +1790,6 @@ class RequestConverter extends AbstractQueryProcessor {
 		return getEsQuery(query, (q) -> elasticsearchConverter.updateQuery(q, clazz));
 	}
 
-	@SuppressWarnings("StatementWithEmptyBody")
 	private void addPostFilter(Query query, SearchRequest.Builder builder) {
 
 		// we only need to handle NativeQuery here. filter from a CriteriaQuery are added into the query and not as post
@@ -1989,9 +2020,12 @@ class RequestConverter extends AbstractQueryProcessor {
 	private SourceConfig getSourceConfig(Query query) {
 
 		if (query.getSourceFilter() != null) {
-			return SourceConfig.of(s -> s //
-					.filter(sfb -> {
-						SourceFilter sourceFilter = query.getSourceFilter();
+			return SourceConfig.of(s -> {
+				SourceFilter sourceFilter = query.getSourceFilter();
+				if (sourceFilter.fetchSource() != null) {
+					s.fetch(sourceFilter.fetchSource());
+				} else {
+					s.filter(sfb -> {
 						String[] includes = sourceFilter.getIncludes();
 						String[] excludes = sourceFilter.getExcludes();
 
@@ -2004,7 +2038,10 @@ class RequestConverter extends AbstractQueryProcessor {
 						}
 
 						return sfb;
-					}));
+					});
+				}
+				return s;
+			});
 		} else {
 			return null;
 		}

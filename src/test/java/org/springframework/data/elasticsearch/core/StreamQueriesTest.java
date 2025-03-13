@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2024 the original author or authors.
+ * Copyright 2020-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ package org.springframework.data.elasticsearch.core;
 
 import static org.assertj.core.api.Assertions.*;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -32,6 +33,7 @@ import org.springframework.data.util.StreamUtils;
  * @author Sascha Woo
  * @author Peter-Josef Meisch
  * @author Haibo Liu
+ * @author Mohamed El Harrougui
  */
 public class StreamQueriesTest {
 
@@ -181,6 +183,7 @@ public class StreamQueriesTest {
 	}
 
 	private SearchScrollHits<String> newSearchScrollHits(List<SearchHit<String>> hits, String scrollId) {
-		return new SearchHitsImpl<>(hits.size(), TotalHitsRelation.EQUAL_TO, 0, scrollId, null, hits, null, null, null);
+		return new SearchHitsImpl<>(hits.size(), TotalHitsRelation.EQUAL_TO, 0, Duration.ofMillis(1), scrollId, null, hits,
+				null, null, null);
 	}
 }

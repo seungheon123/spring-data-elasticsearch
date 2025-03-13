@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2024 the original author or authors.
+ * Copyright 2020-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import java.util.Collection;
 import java.util.List;
 
 import org.json.JSONException;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.annotation.Id;
@@ -31,15 +32,15 @@ import org.springframework.data.elasticsearch.annotations.FieldType;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.junit.jupiter.SpringIntegrationTest;
 import org.springframework.data.elasticsearch.repository.ElasticsearchRepository;
-import org.springframework.data.elasticsearch.repository.query.ElasticsearchPartQuery;
 import org.springframework.data.elasticsearch.repository.query.ElasticsearchQueryMethod;
+import org.springframework.data.elasticsearch.repository.query.RepositoryPartQuery;
 import org.springframework.data.projection.SpelAwareProxyProjectionFactory;
 import org.springframework.data.repository.core.support.DefaultRepositoryMetadata;
-import org.springframework.data.repository.query.QueryMethodEvaluationContextProvider;
+import org.springframework.data.repository.query.ValueExpressionDelegate;
 import org.springframework.lang.Nullable;
 
 /**
- * Tests for {@link ElasticsearchPartQuery}. The tests make sure that queries are built according to the method naming.
+ * Tests for {@link RepositoryPartQuery}. The tests make sure that queries are built according to the method naming.
  * Classes implementing this abstract class are in the packages of their request factories and converters as these are
  * kept package private.
  *
@@ -48,7 +49,7 @@ import org.springframework.lang.Nullable;
  */
 @SuppressWarnings("SpringJavaInjectionPointsAutowiringInspection")
 @SpringIntegrationTest
-public abstract class ElasticsearchPartQueryIntegrationTests {
+public abstract class RepositoryPartQueryIntegrationTests {
 
 	public static final String BOOK_TITLE = "Title";
 	public static final int BOOK_PRICE = 42;
@@ -639,6 +640,45 @@ public abstract class ElasticsearchPartQueryIntegrationTests {
 		assertEquals(expected, query, false);
 	}
 
+	@Test // #3072
+	@DisplayName("should build sort object with correct field names")
+	void shouldBuildSortObjectWithCorrectFieldNames() throws NoSuchMethodException, JSONException {
+
+		String methodName = "findByNameOrderBySortAuthor_SortName";
+		Class<?>[] parameterClasses = new Class[] { String.class };
+		Object[] parameters = new Object[] { BOOK_TITLE };
+
+		String query = getQueryString(methodName, parameterClasses, parameters);
+
+		String expected = """
+
+				{
+				              "query": {
+				                "bool": {
+				                  "must": [
+				                    {
+				                      "query_string": {
+				                        "query": "Title",
+				                        "fields": [
+				                          "name"
+				                        ]
+				                      }
+				                    }
+				                  ]
+				                }
+				              },
+				              "sort": [
+				                {
+				                  "sort_author.sort_name": {
+				                    "order": "asc"
+				                  }
+				                }
+				              ]
+				            }""";
+
+		assertEquals(expected, query, false);
+	}
+
 	private String getQueryString(String methodName, Class<?>[] parameterClasses, Object[] parameters)
 			throws NoSuchMethodException {
 
@@ -646,8 +686,8 @@ public abstract class ElasticsearchPartQueryIntegrationTests {
 		ElasticsearchQueryMethod queryMethod = new ElasticsearchQueryMethod(method,
 				new DefaultRepositoryMetadata(SampleRepository.class), new SpelAwareProxyProjectionFactory(),
 				operations.getElasticsearchConverter().getMappingContext());
-		ElasticsearchPartQuery partQuery = new ElasticsearchPartQuery(queryMethod, operations,
-				QueryMethodEvaluationContextProvider.DEFAULT);
+		RepositoryPartQuery partQuery = new RepositoryPartQuery(queryMethod, operations,
+				ValueExpressionDelegate.create());
 		Query query = partQuery.createQuery(parameters);
 		return buildQueryString(query, Book.class);
 	}
@@ -726,6 +766,8 @@ public abstract class ElasticsearchPartQueryIntegrationTests {
 
 		List<Book> findByAvailableTrueOrderByNameDesc();
 
+		List<Book> findByNameOrderBySortAuthor_SortName(String name);
+
 	}
 
 	public static class Book {
@@ -734,6 +776,10 @@ public abstract class ElasticsearchPartQueryIntegrationTests {
 		@Nullable private String name;
 		@Nullable private Integer price;
 		@Field(type = FieldType.Boolean) private boolean available;
+
+		// this is needed for the #3072 test
+		@Nullable
+		@Field(name = "sort_author", type = FieldType.Object) private Author sortAuthor;
 
 		@Nullable
 		public String getId() {
@@ -766,8 +812,32 @@ public abstract class ElasticsearchPartQueryIntegrationTests {
 			return available;
 		}
 
+		@Nullable
+		public Author getSortAuthor() {
+			return sortAuthor;
+		}
+
+		public void setSortAuthor(@Nullable Author sortAuthor) {
+			this.sortAuthor = sortAuthor;
+		}
+
 		public void setAvailable(Boolean available) {
 			this.available = available;
+
+		}
+	}
+
+	public static class Author {
+		@Nullable
+		@Field(name = "sort_name", type = FieldType.Keyword) private String sortName;
+
+		@Nullable
+		public String getSortName() {
+			return sortName;
+		}
+
+		public void setSortName(@Nullable String sortName) {
+			this.sortName = sortName;
 		}
 	}
 }

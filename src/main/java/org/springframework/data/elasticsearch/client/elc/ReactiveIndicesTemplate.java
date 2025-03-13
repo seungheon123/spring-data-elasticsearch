@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2024 the original author or authors.
+ * Copyright 2021-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
  */
 package org.springframework.data.elasticsearch.client.elc;
 
-import static org.springframework.util.StringUtils.hasText;
+import static org.springframework.util.StringUtils.*;
 
 import co.elastic.clients.elasticsearch._types.AcknowledgedResponseBase;
 import co.elastic.clients.elasticsearch.indices.*;
@@ -24,6 +24,7 @@ import co.elastic.clients.transport.endpoints.BooleanResponse;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -46,6 +47,8 @@ import org.springframework.data.elasticsearch.core.index.GetIndexTemplateRequest
 import org.springframework.data.elasticsearch.core.index.GetTemplateRequest;
 import org.springframework.data.elasticsearch.core.index.PutIndexTemplateRequest;
 import org.springframework.data.elasticsearch.core.index.PutTemplateRequest;
+import org.springframework.data.elasticsearch.core.mapping.Alias;
+import org.springframework.data.elasticsearch.core.mapping.CreateIndexSettings;
 import org.springframework.data.elasticsearch.core.mapping.ElasticsearchPersistentEntity;
 import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
 import org.springframework.lang.Nullable;
@@ -130,8 +133,14 @@ public class ReactiveIndicesTemplate
 
 	private Mono<Boolean> doCreate(IndexCoordinates indexCoordinates, Map<String, Object> settings,
 			@Nullable Document mapping) {
+		Set<Alias> aliases = (boundClass != null) ? getAliasesFor(boundClass) : new HashSet<>();
+		CreateIndexSettings indexSettings = CreateIndexSettings.builder(indexCoordinates)
+				.withAliases(aliases)
+				.withSettings(settings)
+				.withMapping(mapping)
+				.build();
 
-		CreateIndexRequest createIndexRequest = requestConverter.indicesCreateRequest(indexCoordinates, settings, mapping);
+		CreateIndexRequest createIndexRequest = requestConverter.indicesCreateRequest(indexSettings);
 		Mono<CreateIndexResponse> createIndexResponse = Mono.from(execute(client -> client.create(createIndexRequest)));
 		return createIndexResponse.map(CreateIndexResponse::acknowledged);
 	}
@@ -433,6 +442,15 @@ public class ReactiveIndicesTemplate
 	// region helper functions
 	private IndexCoordinates getIndexCoordinatesFor(Class<?> clazz) {
 		return elasticsearchConverter.getMappingContext().getRequiredPersistentEntity(clazz).getIndexCoordinates();
+	}
+
+	/**
+	 * Get the {@link Alias} of the provided class.
+	 *
+	 * @param clazz provided class that can be used to extract aliases.
+	 */
+	private Set<Alias> getAliasesFor(Class<?> clazz) {
+		return elasticsearchConverter.getMappingContext().getRequiredPersistentEntity(clazz).getAliases();
 	}
 
 	private Class<?> checkForBoundClass() {

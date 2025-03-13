@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2024 the original author or authors.
+ * Copyright 2013-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ import org.springframework.core.convert.ConversionService;
 import org.springframework.dao.InvalidDataAccessApiUsageException;
 import org.springframework.data.elasticsearch.annotations.Highlight;
 import org.springframework.data.elasticsearch.annotations.Query;
+import org.springframework.data.elasticsearch.annotations.SearchTemplateQuery;
 import org.springframework.data.elasticsearch.annotations.SourceFilters;
 import org.springframework.data.elasticsearch.core.SearchHit;
 import org.springframework.data.elasticsearch.core.SearchHits;
@@ -43,6 +44,7 @@ import org.springframework.data.elasticsearch.core.query.RuntimeField;
 import org.springframework.data.elasticsearch.core.query.ScriptedField;
 import org.springframework.data.elasticsearch.core.query.SourceFilter;
 import org.springframework.data.elasticsearch.repository.support.QueryStringProcessor;
+import org.springframework.data.expression.ValueEvaluationContextProvider;
 import org.springframework.data.mapping.context.MappingContext;
 import org.springframework.data.projection.ProjectionFactory;
 import org.springframework.data.repository.core.RepositoryMetadata;
@@ -84,6 +86,7 @@ public class ElasticsearchQueryMethod extends QueryMethod {
 	@Nullable private final Query queryAnnotation;
 	@Nullable private final Highlight highlightAnnotation;
 	@Nullable private final SourceFilters sourceFilters;
+	@Nullable private final SearchTemplateQuery searchTemplateQueryAnnotation;
 
 	public ElasticsearchQueryMethod(Method method, RepositoryMetadata repositoryMetadata, ProjectionFactory factory,
 			MappingContext<? extends ElasticsearchPersistentEntity<?>, ElasticsearchPersistentProperty> mappingContext) {
@@ -98,15 +101,9 @@ public class ElasticsearchQueryMethod extends QueryMethod {
 		this.highlightAnnotation = AnnotatedElementUtils.findMergedAnnotation(method, Highlight.class);
 		this.sourceFilters = AnnotatedElementUtils.findMergedAnnotation(method, SourceFilters.class);
 		this.unwrappedReturnType = potentiallyUnwrapReturnTypeFor(repositoryMetadata, method);
+		this.searchTemplateQueryAnnotation = AnnotatedElementUtils.findMergedAnnotation(method, SearchTemplateQuery.class);
 
 		verifyCountQueryTypes();
-	}
-
-	@SuppressWarnings("removal")
-	@Override
-	@Deprecated
-	protected Parameters<?, ?> createParameters(Method method, TypeInformation<?> domainType) {
-		return new ElasticsearchParameters(ParametersSource.of(method));
 	}
 
 	@Override
@@ -125,12 +122,16 @@ public class ElasticsearchQueryMethod extends QueryMethod {
 		}
 	}
 
+	/**
+	 * @return if the method is annotated with the {@link Query} annotation.
+	 */
 	public boolean hasAnnotatedQuery() {
 		return this.queryAnnotation != null;
 	}
 
 	/**
-	 * @return the query String. Must not be {@literal null} when {@link #hasAnnotatedQuery()} returns true
+	 * @return the query String defined in the {@link Query} annotation. Must not be {@literal null} when
+	 *         {@link #hasAnnotatedQuery()} returns true.
 	 */
 	@Nullable
 	public String getAnnotatedQuery() {
@@ -156,6 +157,27 @@ public class ElasticsearchQueryMethod extends QueryMethod {
 		Assert.notNull(highlightAnnotation, "highlightAnnotation must not be null");
 
 		return new HighlightQuery(highlightConverter.convert(highlightAnnotation), getDomainClass());
+	}
+
+	/**
+	 * @return if the method is annotated with the {@link SearchTemplateQuery} annotation.
+	 * @since 5.5
+	 */
+	public boolean hasAnnotatedSearchTemplateQuery() {
+		return this.searchTemplateQueryAnnotation != null;
+	}
+
+	/**
+	 * @return the {@link SearchTemplateQuery} annotation
+	 * @throws IllegalArgumentException if no {@link SearchTemplateQuery} annotation is present on the method
+	 * @since 5.5
+	 */
+	public SearchTemplateQuery getAnnotatedSearchTemplateQuery() {
+
+		Assert.isTrue(hasAnnotatedSearchTemplateQuery(), "no SearchTemplateQuery annotation present on " + getName());
+		Assert.notNull(searchTemplateQueryAnnotation, "highlsearchTemplateQueryAnnotationightAnnotation must not be null");
+
+		return searchTemplateQueryAnnotation;
 	}
 
 	/**
@@ -281,7 +303,7 @@ public class ElasticsearchQueryMethod extends QueryMethod {
 
 	/**
 	 * @return {@literal true} if the method is annotated with
-	 *         {@link org.springframework.data.elasticsearch.annotations.CountQuery} or with {@link Query}(count =true)
+	 *         {@link org.springframework.data.elasticsearch.annotations.CountQuery} or with {@link Query}(count = true)
 	 * @since 4.2
 	 */
 	public boolean hasCountQueryAnnotation() {
@@ -303,7 +325,7 @@ public class ElasticsearchQueryMethod extends QueryMethod {
 	@Nullable
 	SourceFilter getSourceFilter(ElasticsearchParametersParameterAccessor parameterAccessor,
 			ElasticsearchConverter converter,
-			QueryMethodEvaluationContextProvider evaluationContextProvider) {
+			ValueEvaluationContextProvider evaluationContextProvider) {
 
 		if (sourceFilters == null || (sourceFilters.includes().length == 0 && sourceFilters.excludes().length == 0)) {
 			return null;
@@ -326,7 +348,7 @@ public class ElasticsearchQueryMethod extends QueryMethod {
 	}
 
 	private String[] mapParameters(String[] source, ElasticsearchParametersParameterAccessor parameterAccessor,
-			ConversionService conversionService, QueryMethodEvaluationContextProvider evaluationContextProvider) {
+			ConversionService conversionService, ValueEvaluationContextProvider evaluationContextProvider) {
 
 		List<String> fieldNames = new ArrayList<>();
 
@@ -377,9 +399,9 @@ public class ElasticsearchQueryMethod extends QueryMethod {
 		}
 	}
 
-	void addMethodParameter(BaseQuery query, ElasticsearchParametersParameterAccessor parameterAccessor,
-			ElasticsearchConverter elasticsearchConverter,
-			QueryMethodEvaluationContextProvider evaluationContextProvider) {
+	void addSpecialMethodParameters(BaseQuery query, ElasticsearchParametersParameterAccessor parameterAccessor,
+									ElasticsearchConverter elasticsearchConverter,
+									ValueEvaluationContextProvider evaluationContextProvider) {
 
 		if (hasAnnotatedHighlight()) {
 			var highlightQuery = getAnnotatedHighlightQuery(new HighlightConverter(parameterAccessor,

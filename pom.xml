@@ -5,12 +5,12 @@
 
 	<groupId>org.springframework.data</groupId>
 	<artifactId>spring-data-elasticsearch</artifactId>
-	<version>5.3.0-SNAPSHOT</version>
+	<version>5.5.0-SNAPSHOT</version>
 
 	<parent>
 		<groupId>org.springframework.data.build</groupId>
 		<artifactId>spring-data-parent</artifactId>
-		<version>3.3.0-SNAPSHOT</version>
+		<version>3.5.0-SNAPSHOT</version>
 	</parent>
 
 	<name>Spring Data Elasticsearch</name>
@@ -18,17 +18,16 @@
 	<url>https://github.com/spring-projects/spring-data-elasticsearch</url>
 
 	<properties>
-		<springdata.commons>3.3.0-SNAPSHOT</springdata.commons>
+		<springdata.commons>3.5.0-SNAPSHOT</springdata.commons>
 
 		<!-- version of the ElasticsearchClient	-->
-		<elasticsearch-java>8.13.2</elasticsearch-java>
+		<elasticsearch-java>8.17.2</elasticsearch-java>
 
-		<blockhound-junit>1.0.8.RELEASE</blockhound-junit>
-		<hoverfly>0.14.4</hoverfly>
-		<log4j>2.18.0</log4j>
-		<jsonassert>1.5.1</jsonassert>
-		<testcontainers>1.18.0</testcontainers>
-		<wiremock>2.35.1</wiremock>
+		<hoverfly>0.19.0</hoverfly>
+		<log4j>2.23.1</log4j>
+		<jsonassert>1.5.3</jsonassert>
+		<testcontainers>1.20.0</testcontainers>
+		<wiremock>3.9.1</wiremock>
 
 		<java-module-name>spring.data.elasticsearch</java-module-name>
 
@@ -124,17 +123,6 @@
 		<dependency>
 			<groupId>co.elastic.clients</groupId>
 			<artifactId>elasticsearch-java</artifactId>
-			<version>${elasticsearch-java}</version>
-			<exclusions>
-				<exclusion>
-					<groupId>commons-logging</groupId>
-					<artifactId>commons-logging</artifactId>
-				</exclusion>
-			</exclusions>
-		</dependency>
-		<dependency>
-			<groupId>org.elasticsearch.client</groupId>
-			<artifactId>elasticsearch-rest-client</artifactId> <!-- is Apache 2-->
 			<version>${elasticsearch-java}</version>
 			<exclusions>
 				<exclusion>
@@ -249,13 +237,6 @@
 		</dependency>
 
 		<dependency>
-			<groupId>io.projectreactor.tools</groupId>
-			<artifactId>blockhound-junit-platform</artifactId>
-			<version>${blockhound-junit}</version>
-			<scope>test</scope>
-		</dependency>
-
-		<dependency>
 			<groupId>org.skyscreamer</groupId>
 			<artifactId>jsonassert</artifactId>
 			<version>${jsonassert}</version>
@@ -263,8 +244,8 @@
 		</dependency>
 
 		<dependency>
-			<groupId>com.github.tomakehurst</groupId>
-			<artifactId>wiremock-jre8</artifactId>
+			<groupId>org.wiremock</groupId>
+			<artifactId>wiremock</artifactId>
 			<version>${wiremock}</version>
 			<scope>test</scope>
 			<exclusions>
@@ -444,25 +425,6 @@
 		</profile>
 
 		<profile>
-			<id>jdk13+</id>
-			<!-- on jDK13+, Blockhound needs this JVM flag set -->
-			<activation>
-				<jdk>[13,)</jdk>
-			</activation>
-			<build>
-				<plugins>
-					<plugin>
-						<groupId>org.apache.maven.plugins</groupId>
-						<artifactId>maven-surefire-plugin</artifactId>
-						<configuration>
-							<argLine>-XX:+AllowRedefinitionToAddDeleteMethods</argLine>
-						</configuration>
-					</plugin>
-				</plugins>
-			</build>
-		</profile>
-
-		<profile>
 			<id>antora-process-resources</id>
 			<build>
 				<resources>
@@ -479,7 +441,7 @@
 			<build>
 				<plugins>
 					<plugin>
-						<groupId>io.spring.maven.antora</groupId>
+						<groupId>org.antora</groupId>
 						<artifactId>antora-maven-plugin</artifactId>
 					</plugin>
 				</plugins>

@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2024 the original author or authors.
+ * Copyright 2019-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,15 +23,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import org.springframework.data.elasticsearch.annotations.DateFormat;
-import org.springframework.data.elasticsearch.annotations.Field;
-import org.springframework.data.elasticsearch.annotations.FieldType;
-import org.springframework.data.elasticsearch.annotations.IndexOptions;
-import org.springframework.data.elasticsearch.annotations.IndexPrefixes;
-import org.springframework.data.elasticsearch.annotations.InnerField;
-import org.springframework.data.elasticsearch.annotations.NullValueType;
-import org.springframework.data.elasticsearch.annotations.Similarity;
-import org.springframework.data.elasticsearch.annotations.TermVector;
+import org.springframework.data.elasticsearch.annotations.*;
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
@@ -49,6 +41,7 @@ import com.fasterxml.jackson.databind.node.TextNode;
  * @author Brian Kimmig
  * @author Morgan Lutz
  * @author Sascha Woo
+ * @author Haibo Liu
  * @since 4.0
  */
 public final class MappingParameters {
@@ -78,6 +71,10 @@ public final class MappingParameters {
 	static final String FIELD_PARAM_ORIENTATION = "orientation";
 	static final String FIELD_PARAM_POSITIVE_SCORE_IMPACT = "positive_score_impact";
 	static final String FIELD_PARAM_DIMS = "dims";
+	static final String FIELD_PARAM_ELEMENT_TYPE = "element_type";
+	static final String FIELD_PARAM_M = "m";
+	static final String FIELD_PARAM_EF_CONSTRUCTION = "ef_construction";
+	static final String FIELD_PARAM_CONFIDENCE_INTERVAL = "confidence_interval";
 	static final String FIELD_PARAM_SCALING_FACTOR = "scaling_factor";
 	static final String FIELD_PARAM_SEARCH_ANALYZER = "search_analyzer";
 	static final String FIELD_PARAM_STORE = "store";
@@ -110,12 +107,16 @@ public final class MappingParameters {
 	private final Integer positionIncrementGap;
 	private final boolean positiveScoreImpact;
 	private final Integer dims;
+	private final String elementType;
+	private final KnnSimilarity knnSimilarity;
+	@Nullable private final KnnIndexOptions knnIndexOptions;
 	private final String searchAnalyzer;
 	private final double scalingFactor;
 	private final String similarity;
 	private final boolean store;
 	private final TermVector termVector;
 	private final FieldType type;
+	private final String mappedTypeName;
 
 	/**
 	 * extracts the mapping parameters from the relevant annotations.
@@ -141,6 +142,7 @@ public final class MappingParameters {
 		store = field.store();
 		fielddata = field.fielddata();
 		type = field.type();
+		mappedTypeName = StringUtils.hasText(field.mappedTypeName()) ? field.mappedTypeName() : type.getMappedName();
 		dateFormats = field.format();
 		dateFormatPatterns = field.pattern();
 		analyzer = field.analyzer();
@@ -171,9 +173,12 @@ public final class MappingParameters {
 		positiveScoreImpact = field.positiveScoreImpact();
 		dims = field.dims();
 		if (type == FieldType.Dense_Vector) {
-			Assert.isTrue(dims >= 1 && dims <= 2048,
-					"Invalid required parameter! Dense_Vector value \"dims\" must be between 1 and 2048.");
+			Assert.isTrue(dims >= 1 && dims <= 4096,
+					"Invalid required parameter! Dense_Vector value \"dims\" must be between 1 and 4096.");
 		}
+		elementType = field.elementType();
+		knnSimilarity = field.knnSimilarity();
+		knnIndexOptions = field.knnIndexOptions().length > 0 ? field.knnIndexOptions()[0] : null;
 		Assert.isTrue(field.enabled() || type == FieldType.Object, "enabled false is only allowed for field type object");
 		enabled = field.enabled();
 		eagerGlobalOrdinals = field.eagerGlobalOrdinals();
@@ -184,6 +189,7 @@ public final class MappingParameters {
 		store = field.store();
 		fielddata = field.fielddata();
 		type = field.type();
+		mappedTypeName = StringUtils.hasText(field.mappedTypeName()) ? field.mappedTypeName() : type.getMappedName();
 		dateFormats = field.format();
 		dateFormatPatterns = field.pattern();
 		analyzer = field.analyzer();
@@ -214,9 +220,12 @@ public final class MappingParameters {
 		positiveScoreImpact = field.positiveScoreImpact();
 		dims = field.dims();
 		if (type == FieldType.Dense_Vector) {
-			Assert.isTrue(dims >= 1 && dims <= 2048,
-					"Invalid required parameter! Dense_Vector value \"dims\" must be between 1 and 2048.");
+			Assert.isTrue(dims >= 1 && dims <= 4096,
+					"Invalid required parameter! Dense_Vector value \"dims\" must be between 1 and 4096.");
 		}
+		elementType = field.elementType();
+		knnSimilarity = field.knnSimilarity();
+		knnIndexOptions = field.knnIndexOptions().length > 0 ? field.knnIndexOptions()[0] : null;
 		enabled = true;
 		eagerGlobalOrdinals = field.eagerGlobalOrdinals();
 	}
@@ -239,7 +248,7 @@ public final class MappingParameters {
 		}
 
 		if (type != FieldType.Auto) {
-			objectNode.put(FIELD_PARAM_TYPE, type.getMappedName());
+			objectNode.put(FIELD_PARAM_TYPE, mappedTypeName);
 
 			if (type == FieldType.Date || type == FieldType.Date_Nanos || type == FieldType.Date_Range) {
 				List<String> formats = new ArrayList<>();
@@ -356,6 +365,48 @@ public final class MappingParameters {
 
 		if (type == FieldType.Dense_Vector) {
 			objectNode.put(FIELD_PARAM_DIMS, dims);
+
+			if (!FieldElementType.DEFAULT.equals(elementType)) {
+				objectNode.put(FIELD_PARAM_ELEMENT_TYPE, elementType);
+			}
+
+			if (knnSimilarity != KnnSimilarity.DEFAULT) {
+				objectNode.put(FIELD_PARAM_SIMILARITY, knnSimilarity.getSimilarity());
+			}
+
+			if (knnSimilarity != KnnSimilarity.DEFAULT) {
+				Assert.isTrue(index, "knn similarity can only be specified when 'index' is true.");
+				objectNode.put(FIELD_PARAM_SIMILARITY, knnSimilarity.getSimilarity());
+			}
+
+			if (knnIndexOptions != null) {
+				Assert.isTrue(index, "knn index options can only be specified when 'index' is true.");
+				ObjectNode indexOptionsNode = objectNode.putObject(FIELD_PARAM_INDEX_OPTIONS);
+				KnnAlgorithmType algoType = knnIndexOptions.type();
+				if (algoType != KnnAlgorithmType.DEFAULT) {
+					if (algoType == KnnAlgorithmType.INT8_HNSW || algoType == KnnAlgorithmType.INT8_FLAT) {
+						Assert.isTrue(!FieldElementType.BYTE.equals(elementType),
+								"'element_type' can only be float when using vector quantization.");
+					}
+					indexOptionsNode.put(FIELD_PARAM_TYPE, algoType.getType());
+				}
+				if (knnIndexOptions.m() >= 0) {
+					Assert.isTrue(algoType == KnnAlgorithmType.HNSW || algoType == KnnAlgorithmType.INT8_HNSW,
+							"knn 'm' parameter can only be applicable to hnsw and int8_hnsw index types.");
+					indexOptionsNode.put(FIELD_PARAM_M, knnIndexOptions.m());
+				}
+				if (knnIndexOptions.efConstruction() >= 0) {
+					Assert.isTrue(algoType == KnnAlgorithmType.HNSW || algoType == KnnAlgorithmType.INT8_HNSW,
+							"knn 'ef_construction' can only be applicable to hnsw and int8_hnsw index types.");
+					indexOptionsNode.put(FIELD_PARAM_EF_CONSTRUCTION, knnIndexOptions.efConstruction());
+				}
+				if (knnIndexOptions.confidenceInterval() >= 0) {
+					Assert.isTrue(algoType == KnnAlgorithmType.INT8_HNSW
+							|| algoType == KnnAlgorithmType.INT8_FLAT,
+							"knn 'confidence_interval' can only be applicable to int8_hnsw and int8_flat index types.");
+					indexOptionsNode.put(FIELD_PARAM_CONFIDENCE_INTERVAL, knnIndexOptions.confidenceInterval());
+				}
+			}
 		}
 
 		if (!enabled) {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2024 the original author or authors.
+ * Copyright 2021-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,13 +21,12 @@ import co.elastic.clients.elasticsearch.indices.*;
 import co.elastic.clients.transport.ElasticsearchTransport;
 import co.elastic.clients.transport.endpoints.BooleanResponse;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.dao.InvalidDataAccessApiUsageException;
 import org.springframework.data.elasticsearch.UncategorizedElasticsearchException;
@@ -46,6 +45,8 @@ import org.springframework.data.elasticsearch.core.index.GetIndexTemplateRequest
 import org.springframework.data.elasticsearch.core.index.GetTemplateRequest;
 import org.springframework.data.elasticsearch.core.index.PutIndexTemplateRequest;
 import org.springframework.data.elasticsearch.core.index.PutTemplateRequest;
+import org.springframework.data.elasticsearch.core.mapping.Alias;
+import org.springframework.data.elasticsearch.core.mapping.CreateIndexSettings;
 import org.springframework.data.elasticsearch.core.mapping.ElasticsearchPersistentEntity;
 import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
 import org.springframework.lang.Nullable;
@@ -59,8 +60,6 @@ import org.springframework.util.Assert;
  */
 public class IndicesTemplate extends ChildTemplate<ElasticsearchTransport, ElasticsearchIndicesClient>
 		implements IndexOperations {
-
-	private static final Log LOGGER = LogFactory.getLog(IndicesTemplate.class);
 
 	// we need a cluster client as well because ES has put some methods from the indices API into the cluster client
 	// (component templates)
@@ -85,7 +84,7 @@ public class IndicesTemplate extends ChildTemplate<ElasticsearchTransport, Elast
 	}
 
 	public IndicesTemplate(ElasticsearchIndicesClient client, ClusterTemplate clusterTemplate,
-												 ElasticsearchConverter elasticsearchConverter, IndexCoordinates boundIndex) {
+			ElasticsearchConverter elasticsearchConverter, IndexCoordinates boundIndex) {
 		super(client, elasticsearchConverter);
 
 		Assert.notNull(clusterTemplate, "cluster must not be null");
@@ -137,11 +136,14 @@ public class IndicesTemplate extends ChildTemplate<ElasticsearchTransport, Elast
 
 	protected boolean doCreate(IndexCoordinates indexCoordinates, Map<String, Object> settings,
 			@Nullable Document mapping) {
+		Set<Alias> aliases = (boundClass != null) ? getAliasesFor(boundClass) : new HashSet<>();
+		CreateIndexSettings indexSettings = CreateIndexSettings.builder(indexCoordinates)
+				.withAliases(aliases)
+				.withSettings(settings)
+				.withMapping(mapping)
+				.build();
 
-		Assert.notNull(indexCoordinates, "indexCoordinates must not be null");
-		Assert.notNull(settings, "settings must not be null");
-
-		CreateIndexRequest createIndexRequest = requestConverter.indicesCreateRequest(indexCoordinates, settings, mapping);
+		CreateIndexRequest createIndexRequest = requestConverter.indicesCreateRequest(indexSettings);
 		CreateIndexResponse createIndexResponse = execute(client -> client.create(createIndexRequest));
 		return Boolean.TRUE.equals(createIndexResponse.acknowledged());
 	}
@@ -236,8 +238,7 @@ public class IndicesTemplate extends ChildTemplate<ElasticsearchTransport, Elast
 		GetMappingRequest getMappingRequest = requestConverter.indicesGetMappingRequest(indexCoordinates);
 		GetMappingResponse getMappingResponse = execute(client -> client.getMapping(getMappingRequest));
 
-		Document mappingResponse = responseConverter.indicesGetMapping(getMappingResponse, indexCoordinates);
-		return mappingResponse;
+		return responseConverter.indicesGetMapping(getMappingResponse, indexCoordinates);
 	}
 
 	@Override
@@ -448,6 +449,15 @@ public class IndicesTemplate extends ChildTemplate<ElasticsearchTransport, Elast
 
 	public IndexCoordinates getIndexCoordinatesFor(Class<?> clazz) {
 		return getRequiredPersistentEntity(clazz).getIndexCoordinates();
+	}
+
+	/**
+	 * Get the {@link Alias} of the provided class.
+	 *
+	 * @param clazz provided class that can be used to extract aliases.
+	 */
+	public Set<Alias> getAliasesFor(Class<?> clazz) {
+		return getRequiredPersistentEntity(clazz).getAliases();
 	}
 	// endregion
 }

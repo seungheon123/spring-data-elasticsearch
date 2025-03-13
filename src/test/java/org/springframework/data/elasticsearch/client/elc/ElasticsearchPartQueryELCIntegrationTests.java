@@ -1,5 +1,5 @@
 /*
- * Copyright 2022-2024 the original author or authors.
+ * Copyright 2022-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import co.elastic.clients.json.jackson.JacksonJsonpMapper;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
-import org.springframework.data.elasticsearch.core.query.ElasticsearchPartQueryIntegrationTests;
+import org.springframework.data.elasticsearch.core.query.RepositoryPartQueryIntegrationTests;
 import org.springframework.data.elasticsearch.core.query.Query;
 import org.springframework.data.elasticsearch.junit.jupiter.ElasticsearchTemplateConfiguration;
 
@@ -29,7 +29,7 @@ import org.springframework.data.elasticsearch.junit.jupiter.ElasticsearchTemplat
  * @author Peter-Josef Meisch
  * @since 4.4
  */
-public class ElasticsearchPartQueryELCIntegrationTests extends ElasticsearchPartQueryIntegrationTests {
+public class ElasticsearchPartQueryELCIntegrationTests extends RepositoryPartQueryIntegrationTests {
 
 	@Configuration
 	@Import({ ElasticsearchTemplateConfiguration.class })

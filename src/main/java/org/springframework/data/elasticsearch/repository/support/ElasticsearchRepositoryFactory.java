@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2024 the original author or authors.
+ * Copyright 2013-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,9 +22,10 @@ import java.util.Optional;
 
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.repository.ElasticsearchRepository;
-import org.springframework.data.elasticsearch.repository.query.ElasticsearchPartQuery;
 import org.springframework.data.elasticsearch.repository.query.ElasticsearchQueryMethod;
-import org.springframework.data.elasticsearch.repository.query.ElasticsearchStringQuery;
+import org.springframework.data.elasticsearch.repository.query.RepositoryPartQuery;
+import org.springframework.data.elasticsearch.repository.query.RepositorySearchTemplateQuery;
+import org.springframework.data.elasticsearch.repository.query.RepositoryStringQuery;
 import org.springframework.data.elasticsearch.repository.support.querybyexample.QueryByExampleElasticsearchExecutor;
 import org.springframework.data.projection.ProjectionFactory;
 import org.springframework.data.querydsl.QuerydslPredicateExecutor;
@@ -37,8 +38,8 @@ import org.springframework.data.repository.core.support.RepositoryFragment;
 import org.springframework.data.repository.query.QueryByExampleExecutor;
 import org.springframework.data.repository.query.QueryLookupStrategy;
 import org.springframework.data.repository.query.QueryLookupStrategy.Key;
-import org.springframework.data.repository.query.QueryMethodEvaluationContextProvider;
 import org.springframework.data.repository.query.RepositoryQuery;
+import org.springframework.data.repository.query.ValueExpressionDelegate;
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 
@@ -96,16 +97,16 @@ public class ElasticsearchRepositoryFactory extends RepositoryFactorySupport {
 
 	@Override
 	protected Optional<QueryLookupStrategy> getQueryLookupStrategy(@Nullable Key key,
-			QueryMethodEvaluationContextProvider evaluationContextProvider) {
-		return Optional.of(new ElasticsearchQueryLookupStrategy(evaluationContextProvider));
+			ValueExpressionDelegate valueExpressionDelegate) {
+		return Optional.of(new ElasticsearchQueryLookupStrategy(valueExpressionDelegate));
 	}
 
 	private class ElasticsearchQueryLookupStrategy implements QueryLookupStrategy {
 
-		private final QueryMethodEvaluationContextProvider evaluationContextProvider;
+		private final ValueExpressionDelegate valueExpressionDelegate;
 
-		ElasticsearchQueryLookupStrategy(QueryMethodEvaluationContextProvider evaluationContextProvider) {
-			this.evaluationContextProvider = evaluationContextProvider;
+		ElasticsearchQueryLookupStrategy(ValueExpressionDelegate valueExpressionDelegate) {
+			this.valueExpressionDelegate = valueExpressionDelegate;
 		}
 
 		/*
@@ -122,13 +123,17 @@ public class ElasticsearchRepositoryFactory extends RepositoryFactorySupport {
 
 			if (namedQueries.hasQuery(namedQueryName)) {
 				String namedQuery = namedQueries.getQuery(namedQueryName);
-				return new ElasticsearchStringQuery(queryMethod, elasticsearchOperations, namedQuery,
-						evaluationContextProvider);
+				return new RepositoryStringQuery(queryMethod, elasticsearchOperations, namedQuery,
+						valueExpressionDelegate);
 			} else if (queryMethod.hasAnnotatedQuery()) {
-				return new ElasticsearchStringQuery(queryMethod, elasticsearchOperations, queryMethod.getAnnotatedQuery(),
-						evaluationContextProvider);
+				return new RepositoryStringQuery(queryMethod, elasticsearchOperations, queryMethod.getAnnotatedQuery(),
+						valueExpressionDelegate);
+			} else if (queryMethod.hasAnnotatedSearchTemplateQuery()) {
+				var searchTemplateQuery = queryMethod.getAnnotatedSearchTemplateQuery();
+				return new RepositorySearchTemplateQuery(queryMethod, elasticsearchOperations, valueExpressionDelegate,
+						searchTemplateQuery.id());
 			}
-			return new ElasticsearchPartQuery(queryMethod, elasticsearchOperations, evaluationContextProvider);
+			return new RepositoryPartQuery(queryMethod, elasticsearchOperations, valueExpressionDelegate);
 		}
 	}
 

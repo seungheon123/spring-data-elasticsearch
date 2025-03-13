@@ -1,5 +1,5 @@
 /*
- * Copyright 2022-2024 the original author or authors.
+ * Copyright 2022-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 package org.springframework.data.elasticsearch.client.elc;
 
 import co.elastic.clients.elasticsearch._types.KnnQuery;
+import co.elastic.clients.elasticsearch._types.KnnSearch;
 import co.elastic.clients.elasticsearch._types.SortOptions;
 import co.elastic.clients.elasticsearch._types.aggregations.Aggregation;
 import co.elastic.clients.elasticsearch._types.query_dsl.Query;
@@ -26,6 +27,7 @@ import co.elastic.clients.util.ObjectBuilder;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +40,7 @@ import org.springframework.util.Assert;
 /**
  * @author Peter-Josef Meisch
  * @author Sascha Woo
+ * @author Haibo Liu
  * @since 4.4
  */
 public class NativeQueryBuilder extends BaseQueryBuilder<NativeQuery, NativeQueryBuilder> {
@@ -52,6 +55,7 @@ public class NativeQueryBuilder extends BaseQueryBuilder<NativeQuery, NativeQuer
 
 	@Nullable private org.springframework.data.elasticsearch.core.query.Query springDataQuery;
 	@Nullable private KnnQuery knnQuery;
+	@Nullable private List<KnnSearch> knnSearches = Collections.emptyList();
 
 	public NativeQueryBuilder() {}
 
@@ -90,6 +94,14 @@ public class NativeQueryBuilder extends BaseQueryBuilder<NativeQuery, NativeQuer
 	@Nullable
 	public KnnQuery getKnnQuery() {
 		return knnQuery;
+	}
+
+	/**
+	 * @since 5.3.1
+	 */
+	@Nullable
+	public List<KnnSearch> getKnnSearches() {
+		return knnSearches;
 	}
 
 	@Nullable
@@ -202,11 +214,28 @@ public class NativeQueryBuilder extends BaseQueryBuilder<NativeQuery, NativeQuer
 	}
 
 	/**
-	 * @since 5.1
+	 * @since 5.4
 	 */
-	public NativeQueryBuilder withKnnQuery(KnnQuery knnQuery) {
-		this.knnQuery = knnQuery;
+	public NativeQueryBuilder withKnnSearches(List<KnnSearch> knnSearches) {
+		this.knnSearches = knnSearches;
 		return this;
+	}
+
+	/**
+	 * @since 5.4
+	 */
+	public NativeQueryBuilder withKnnSearches(Function<KnnSearch.Builder, ObjectBuilder<KnnSearch>> fn) {
+
+		Assert.notNull(fn, "fn must not be null");
+
+		return withKnnSearches(fn.apply(new KnnSearch.Builder()).build());
+	}
+
+	/**
+	 * @since 5.4
+	 */
+	public NativeQueryBuilder withKnnSearches(KnnSearch knnSearch) {
+		return withKnnSearches(List.of(knnSearch));
 	}
 
 	public NativeQuery build() {

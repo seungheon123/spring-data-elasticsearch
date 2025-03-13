@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2024 the original author or authors.
+ * Copyright 2021-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import co.elastic.clients.transport.endpoints.EndpointWithResponseMapperAttr;
 import co.elastic.clients.util.ObjectBuilder;
 import reactor.core.publisher.Mono;
 
+import java.io.IOException;
 import java.util.function.Function;
 
 import org.springframework.lang.Nullable;
@@ -36,6 +37,7 @@ import org.springframework.util.Assert;
  * Reactive version of {@link co.elastic.clients.elasticsearch.ElasticsearchClient}.
  *
  * @author Peter-Josef Meisch
+ * @author maryantocinn
  * @since 4.4
  */
 public class ReactiveElasticsearchClient extends ApiClient<ElasticsearchTransport, ReactiveElasticsearchClient>
@@ -55,8 +57,11 @@ public class ReactiveElasticsearchClient extends ApiClient<ElasticsearchTranspor
 	}
 
 	@Override
-	public void close() throws Exception {
-		transport.close();
+	public void close() throws IOException {
+		// since Elasticsearch 8.16 the ElasticsearchClient implements (through ApiClient) the Closeable interface and
+		// handles closing of the underlying transport. We now just call the base class, but keep this as we
+		// have been implementing AutoCloseable since 4.4 and won't change that to a mere Closeable
+		super.close();
 	}
 
 	// region child clients
@@ -67,6 +72,10 @@ public class ReactiveElasticsearchClient extends ApiClient<ElasticsearchTranspor
 
 	public ReactiveElasticsearchIndicesClient indices() {
 		return new ReactiveElasticsearchIndicesClient(transport, transportOptions);
+	}
+
+	public ReactiveElasticsearchSqlClient sql() {
+		return new ReactiveElasticsearchSqlClient(transport, transportOptions);
 	}
 
 	// endregion
@@ -122,7 +131,8 @@ public class ReactiveElasticsearchClient extends ApiClient<ElasticsearchTranspor
 		// java.lang.Class<TDocument>)
 		// noinspection unchecked
 		JsonEndpoint<GetRequest, GetResponse<T>, ErrorResponse> endpoint = (JsonEndpoint<GetRequest, GetResponse<T>, ErrorResponse>) GetRequest._ENDPOINT;
-		endpoint = new EndpointWithResponseMapperAttr<>(endpoint, "co.elastic.clients:Deserializer:_global.get.TDocument",
+		endpoint = new EndpointWithResponseMapperAttr<>(endpoint,
+				"co.elastic.clients:Deserializer:_global.get.Response.TDocument",
 				getDeserializer(tClass));
 
 		return Mono.fromFuture(transport.performRequestAsync(request, endpoint, transportOptions));
@@ -141,7 +151,7 @@ public class ReactiveElasticsearchClient extends ApiClient<ElasticsearchTranspor
 
 		// noinspection unchecked
 		JsonEndpoint<UpdateRequest<?, ?>, UpdateResponse<T>, ErrorResponse> endpoint = new EndpointWithResponseMapperAttr(
-				UpdateRequest._ENDPOINT, "co.elastic.clients:Deserializer:_global.update.TDocument",
+				UpdateRequest._ENDPOINT, "co.elastic.clients:Deserializer:_global.update.Response.TDocument",
 				this.getDeserializer(clazz));
 		return Mono.fromFuture(transport.performRequestAsync(request, endpoint, this.transportOptions));
 	}
@@ -167,7 +177,8 @@ public class ReactiveElasticsearchClient extends ApiClient<ElasticsearchTranspor
 
 		// noinspection unchecked
 		JsonEndpoint<MgetRequest, MgetResponse<T>, ErrorResponse> endpoint = (JsonEndpoint<MgetRequest, MgetResponse<T>, ErrorResponse>) MgetRequest._ENDPOINT;
-		endpoint = new EndpointWithResponseMapperAttr<>(endpoint, "co.elastic.clients:Deserializer:_global.mget.TDocument",
+		endpoint = new EndpointWithResponseMapperAttr<>(endpoint,
+				"co.elastic.clients:Deserializer:_global.mget.Response.TDocument",
 				this.getDeserializer(clazz));
 
 		return Mono.fromFuture(transport.performRequestAsync(request, endpoint, transportOptions));
@@ -221,6 +232,26 @@ public class ReactiveElasticsearchClient extends ApiClient<ElasticsearchTranspor
 		Assert.notNull(fn, "fn must not be null");
 
 		return deleteByQuery(fn.apply(new DeleteByQueryRequest.Builder()).build());
+	}
+
+	/**
+	 * @since 5.4
+	 */
+	public Mono<CountResponse> count(CountRequest request) {
+
+		Assert.notNull(request, "request must not be null");
+
+		return Mono.fromFuture(transport.performRequestAsync(request, CountRequest._ENDPOINT, transportOptions));
+	}
+
+	/**
+	 * @since 5.4
+	 */
+	public Mono<CountResponse> count(Function<CountRequest.Builder, ObjectBuilder<CountRequest>> fn) {
+
+		Assert.notNull(fn, "fn must not be null");
+
+		return count(fn.apply(new CountRequest.Builder()).build());
 	}
 
 	// endregion
@@ -278,7 +309,7 @@ public class ReactiveElasticsearchClient extends ApiClient<ElasticsearchTranspor
 		// noinspection unchecked
 		JsonEndpoint<ScrollRequest, ScrollResponse<T>, ErrorResponse> endpoint = (JsonEndpoint<ScrollRequest, ScrollResponse<T>, ErrorResponse>) ScrollRequest._ENDPOINT;
 		endpoint = new EndpointWithResponseMapperAttr<>(endpoint,
-				"co.elastic.clients:Deserializer:_global.scroll.TDocument", getDeserializer(tDocumentClass));
+				"co.elastic.clients:Deserializer:_global.scroll.Response.TDocument", getDeserializer(tDocumentClass));
 
 		return Mono.fromFuture(transport.performRequestAsync(request, endpoint, transportOptions));
 	}

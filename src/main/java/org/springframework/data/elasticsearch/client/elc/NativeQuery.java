@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2024 the original author or authors.
+ * Copyright 2021-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
  */
 package org.springframework.data.elasticsearch.client.elc;
 
-import co.elastic.clients.elasticsearch._types.KnnQuery;
+import co.elastic.clients.elasticsearch._types.KnnSearch;
 import co.elastic.clients.elasticsearch._types.SortOptions;
 import co.elastic.clients.elasticsearch._types.aggregations.Aggregation;
 import co.elastic.clients.elasticsearch._types.query_dsl.Query;
@@ -29,7 +29,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.data.elasticsearch.core.query.BaseQuery;
-import org.springframework.data.elasticsearch.core.query.ScriptedField;
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 
@@ -39,6 +38,7 @@ import org.springframework.util.Assert;
  *
  * @author Peter-Josef Meisch
  * @author Sascha Woo
+ * @author Haibo Liu
  * @since 4.4
  */
 public class NativeQuery extends BaseQuery {
@@ -53,7 +53,7 @@ public class NativeQuery extends BaseQuery {
 	private List<SortOptions> sortOptions = Collections.emptyList();
 
 	private Map<String, JsonData> searchExtensions = Collections.emptyMap();
-	@Nullable private KnnQuery knnQuery;
+	@Nullable private List<KnnSearch> knnSearches = Collections.emptyList();
 
 	public NativeQuery(NativeQueryBuilder builder) {
 		super(builder);
@@ -70,7 +70,7 @@ public class NativeQuery extends BaseQuery {
 					"Cannot add an NativeQuery in a NativeQuery");
 		}
 		this.springDataQuery = builder.getSpringDataQuery();
-		this.knnQuery = builder.getKnnQuery();
+		this.knnSearches = builder.getKnnSearches();
 	}
 
 	public NativeQuery(@Nullable Query query) {
@@ -122,11 +122,11 @@ public class NativeQuery extends BaseQuery {
 	}
 
 	/**
-	 * @since 5.1
+	 * @since 5.3.1
 	 */
 	@Nullable
-	public KnnQuery getKnnQuery() {
-		return knnQuery;
+	public List<KnnSearch> getKnnSearches() {
+		return knnSearches;
 	}
 
 	@Nullable

@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 the original author or authors.
+ * Copyright 2024-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package org.springframework.data.elasticsearch.repository.support;
 import org.springframework.core.convert.ConversionService;
 import org.springframework.data.elasticsearch.repository.query.ElasticsearchParametersParameterAccessor;
 import org.springframework.data.elasticsearch.repository.support.spel.QueryStringSpELEvaluator;
+import org.springframework.data.expression.ValueEvaluationContextProvider;
 import org.springframework.data.repository.query.QueryMethod;
 import org.springframework.data.repository.query.QueryMethodEvaluationContextProvider;
 import org.springframework.util.Assert;
@@ -34,10 +35,10 @@ public class QueryStringProcessor {
 	private final String query;
 	private final QueryMethod queryMethod;
 	private final ConversionService conversionService;
-	private final QueryMethodEvaluationContextProvider evaluationContextProvider;
+	private final ValueEvaluationContextProvider evaluationContextProvider;
 
 	public QueryStringProcessor(String query, QueryMethod queryMethod, ConversionService conversionService,
-								QueryMethodEvaluationContextProvider evaluationContextProvider) {
+								ValueEvaluationContextProvider evaluationContextProvider) {
 
 		Assert.notNull(query, "query must not be null");
 		Assert.notNull(queryMethod, "queryMethod must not be null");

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2024 the original author or authors.
+ * Copyright 2021-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -329,7 +329,7 @@ public final class ElasticsearchClients {
 		Assert.notNull(jsonpMapper, "jsonpMapper must not be null");
 
 		TransportOptions.Builder transportOptionsBuilder = transportOptions != null ? transportOptions.toBuilder()
-				: new RestClientOptions(RequestOptions.DEFAULT).toBuilder();
+				: new RestClientOptions(RequestOptions.DEFAULT, false).toBuilder();
 
 		RestClientOptions.Builder restClientOptionsBuilder = getRestClientOptionsBuilder(transportOptions);
 

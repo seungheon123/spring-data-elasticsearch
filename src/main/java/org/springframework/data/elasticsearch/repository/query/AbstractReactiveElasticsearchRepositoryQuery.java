@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2024 the original author or authors.
+ * Copyright 2019-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
  */
 package org.springframework.data.elasticsearch.repository.query;
 
+import org.springframework.data.expression.ValueEvaluationContextProvider;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -52,11 +53,11 @@ abstract class AbstractReactiveElasticsearchRepositoryQuery implements Repositor
 
 	protected final ReactiveElasticsearchQueryMethod queryMethod;
 	private final ReactiveElasticsearchOperations elasticsearchOperations;
-	protected final QueryMethodEvaluationContextProvider evaluationContextProvider;
+	protected final ValueEvaluationContextProvider evaluationContextProvider;
 
 	AbstractReactiveElasticsearchRepositoryQuery(ReactiveElasticsearchQueryMethod queryMethod,
 			ReactiveElasticsearchOperations elasticsearchOperations,
-			QueryMethodEvaluationContextProvider evaluationContextProvider) {
+												 ValueEvaluationContextProvider evaluationContextProvider) {
 
 		Assert.notNull(queryMethod, "queryMethod must not be null");
 		Assert.notNull(elasticsearchOperations, "elasticsearchOperations must not be null");
@@ -105,7 +106,7 @@ abstract class AbstractReactiveElasticsearchRepositoryQuery implements Repositor
 		var query = createQuery(parameterAccessor);
 		Assert.notNull(query, "unsupported query");
 
-		queryMethod.addMethodParameter(query, parameterAccessor, elasticsearchOperations.getElasticsearchConverter(),
+		queryMethod.addSpecialMethodParameters(query, parameterAccessor, elasticsearchOperations.getElasticsearchConverter(),
 				evaluationContextProvider);
 
 		String indexName = queryMethod.getEntityInformation().getIndexName();

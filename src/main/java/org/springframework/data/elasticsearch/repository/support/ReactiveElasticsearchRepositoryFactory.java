@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2024 the original author or authors.
+ * Copyright 2019-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,8 +23,9 @@ import org.springframework.data.elasticsearch.core.ReactiveElasticsearchOperatio
 import org.springframework.data.elasticsearch.core.mapping.ElasticsearchPersistentEntity;
 import org.springframework.data.elasticsearch.core.mapping.ElasticsearchPersistentProperty;
 import org.springframework.data.elasticsearch.repository.query.ReactiveElasticsearchQueryMethod;
-import org.springframework.data.elasticsearch.repository.query.ReactiveElasticsearchStringQuery;
 import org.springframework.data.elasticsearch.repository.query.ReactivePartTreeElasticsearchQuery;
+import org.springframework.data.elasticsearch.repository.query.ReactiveRepositorySearchTemplateQuery;
+import org.springframework.data.elasticsearch.repository.query.ReactiveRepositoryStringQuery;
 import org.springframework.data.elasticsearch.repository.support.querybyexample.ReactiveQueryByExampleElasticsearchExecutor;
 import org.springframework.data.mapping.context.MappingContext;
 import org.springframework.data.projection.ProjectionFactory;
@@ -36,9 +37,9 @@ import org.springframework.data.repository.core.support.RepositoryComposition;
 import org.springframework.data.repository.core.support.RepositoryFragment;
 import org.springframework.data.repository.query.QueryLookupStrategy;
 import org.springframework.data.repository.query.QueryLookupStrategy.Key;
-import org.springframework.data.repository.query.QueryMethodEvaluationContextProvider;
 import org.springframework.data.repository.query.ReactiveQueryByExampleExecutor;
 import org.springframework.data.repository.query.RepositoryQuery;
+import org.springframework.data.repository.query.ValueExpressionDelegate;
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 
@@ -92,14 +93,10 @@ public class ReactiveElasticsearchRepositoryFactory extends ReactiveRepositoryFa
 		return getTargetRepositoryViaReflection(information, entityInformation, operations);
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * @see org.springframework.data.repository.core.support.RepositoryFactorySupport#getQueryLookupStrategy(org.springframework.data.repository.query.QueryLookupStrategy.Key, org.springframework.data.repository.query.EvaluationContextProvider)
-	 */
 	@Override
 	protected Optional<QueryLookupStrategy> getQueryLookupStrategy(@Nullable Key key,
-			QueryMethodEvaluationContextProvider evaluationContextProvider) {
-		return Optional.of(new ElasticsearchQueryLookupStrategy(operations, evaluationContextProvider, mappingContext));
+			ValueExpressionDelegate valueExpressionDelegate) {
+		return Optional.of(new ElasticsearchQueryLookupStrategy(operations, valueExpressionDelegate, mappingContext));
 	}
 
 	/*
@@ -130,19 +127,19 @@ public class ReactiveElasticsearchRepositoryFactory extends ReactiveRepositoryFa
 	private static class ElasticsearchQueryLookupStrategy implements QueryLookupStrategy {
 
 		private final ReactiveElasticsearchOperations operations;
-		private final QueryMethodEvaluationContextProvider evaluationContextProvider;
+		private final ValueExpressionDelegate valueExpressionDelegate;
 		private final MappingContext<? extends ElasticsearchPersistentEntity<?>, ElasticsearchPersistentProperty> mappingContext;
 
 		public ElasticsearchQueryLookupStrategy(ReactiveElasticsearchOperations operations,
-				QueryMethodEvaluationContextProvider evaluationContextProvider,
+				ValueExpressionDelegate valueExpressionDelegate,
 				MappingContext<? extends ElasticsearchPersistentEntity<?>, ElasticsearchPersistentProperty> mappingContext) {
 
 			Assert.notNull(operations, "operations must not be null");
-			Assert.notNull(evaluationContextProvider, "evaluationContextProvider must not be null");
+			Assert.notNull(valueExpressionDelegate, "evaluationContextProvider must not be null");
 			Assert.notNull(mappingContext, "mappingContext must not be null");
 
 			this.operations = operations;
-			this.evaluationContextProvider = evaluationContextProvider;
+			this.valueExpressionDelegate = valueExpressionDelegate;
 			this.mappingContext = mappingContext;
 		}
 
@@ -161,12 +158,16 @@ public class ReactiveElasticsearchRepositoryFactory extends ReactiveRepositoryFa
 			if (namedQueries.hasQuery(namedQueryName)) {
 				String namedQuery = namedQueries.getQuery(namedQueryName);
 
-				return new ReactiveElasticsearchStringQuery(namedQuery, queryMethod, operations,
-						evaluationContextProvider);
+				return new ReactiveRepositoryStringQuery(namedQuery, queryMethod, operations,
+						valueExpressionDelegate);
 			} else if (queryMethod.hasAnnotatedQuery()) {
-				return new ReactiveElasticsearchStringQuery(queryMethod, operations, evaluationContextProvider);
+				return new ReactiveRepositoryStringQuery(queryMethod, operations, valueExpressionDelegate);
+			} else if (queryMethod.hasAnnotatedSearchTemplateQuery()) {
+				var searchTemplateQuery = queryMethod.getAnnotatedSearchTemplateQuery();
+				return new ReactiveRepositorySearchTemplateQuery(queryMethod, operations, valueExpressionDelegate,
+						searchTemplateQuery.id());
 			} else {
-				return new ReactivePartTreeElasticsearchQuery(queryMethod, operations, evaluationContextProvider);
+				return new ReactivePartTreeElasticsearchQuery(queryMethod, operations, valueExpressionDelegate);
 			}
 		}
 	}

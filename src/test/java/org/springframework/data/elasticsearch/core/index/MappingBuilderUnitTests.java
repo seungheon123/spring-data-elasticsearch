@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2024 the original author or authors.
+ * Copyright 2013-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -62,6 +62,8 @@ import org.springframework.lang.Nullable;
  * @author Roman Puchkovskiy
  * @author Brian Kimmig
  * @author Morgan Lutz
+ * @author Haibo Liu
+ * @author Andriy Redko
  */
 public class MappingBuilderUnitTests extends MappingContextBaseTests {
 
@@ -695,6 +697,32 @@ public class MappingBuilderUnitTests extends MappingContextBaseTests {
 		assertEquals(expected, mapping, false);
 	}
 
+	@Test
+	@DisplayName("should write dense_vector properties for knn search")
+	void shouldWriteDenseVectorPropertiesWithKnnSearch() throws JSONException {
+		String expected = """
+				{
+				  "properties":{
+				    "my_vector":{
+				      "type":"dense_vector",
+				      "dims":16,
+				      "element_type":"float",
+				      "similarity":"dot_product",
+				      "index_options":{
+				        "type":"hnsw",
+				        "m":16,
+				        "ef_construction":100
+				      }
+				    }
+				  }
+				}
+				""";
+
+		String mapping = getMappingBuilder().buildPropertyMapping(DenseVectorEntityWithKnnSearch.class);
+
+		assertEquals(expected, mapping, false);
+	}
+
 	@Test // #1370
 	@DisplayName("should not write mapping when enabled is false on entity")
 	void shouldNotWriteMappingWhenEnabledIsFalseOnEntity() throws JSONException {
@@ -739,6 +767,14 @@ public class MappingBuilderUnitTests extends MappingContextBaseTests {
 
 		assertThatThrownBy(() -> getMappingBuilder().buildPropertyMapping(InvalidDisabledMappingProperty.class))
 				.isInstanceOf(MappingException.class);
+	}
+
+	@Test
+	@DisplayName("should match confidence interval parameter for dense_vector type")
+	void shouldMatchConfidenceIntervalParameterForDenseVectorType() {
+
+		assertThatThrownBy(() -> getMappingBuilder().buildPropertyMapping(DenseVectorMisMatchConfidenceIntervalClass.class))
+				.isInstanceOf(IllegalArgumentException.class);
 	}
 
 	@Test // #1711
@@ -1090,38 +1126,49 @@ public class MappingBuilderUnitTests extends MappingContextBaseTests {
 
 		String expected = """
 				{
-				  "properties": {
-				    "_class": {
-				      "type": "keyword",
-				      "index": false,
-				      "doc_values": false
-				    },
-				    "excluded-date": {
-				      "type": "date",
-				      "format": "date"
-				    },
-				    "nestedEntity": {
-				      "type": "nested",
-				      "properties": {
-				        "_class": {
-				          "type": "keyword",
-				          "index": false,
-				          "doc_values": false
-				        },
-				        "excluded-text": {
-				          "type": "text"
-				        }
-				      }
-				    }
-				  },
-				  "_source": {
-				    "excludes": [
-				      "excluded-date",
-				      "nestedEntity.excluded-text"
-				    ]
-				  }
-				}
-				"""; //
+                 "properties": {
+                   "_class": {
+                     "type": "keyword",
+                     "index": false,
+                     "doc_values": false
+                   },
+                   "excluded-date": {
+                     "type": "date",
+                     "format": "date"
+                   },
+                   "nestedEntity": {
+                     "type": "nested",
+                     "properties": {
+                       "_class": {
+                         "type": "keyword",
+                         "index": false,
+                         "doc_values": false
+                       },
+                       "excluded-text": {
+                         "type": "text"
+                       }
+                     }
+                   },
+                   "excluded-multifield": {
+                     "type": "text",
+                     "fields": {
+                       "keyword": {
+                         "type": "keyword"
+                       }
+                     }
+                   }
+                 },
+                 "_source": {
+                   "excludes": [
+                     "excluded-date",
+                     "nestedEntity.excluded-text",
+                     "excluded-multifield"
+                   ]
+                 }
+
+				              }
+               
+               """; //
 
 		String mapping = getMappingBuilder().buildPropertyMapping(ExcludedFieldEntity.class);
 
@@ -1207,6 +1254,91 @@ public class MappingBuilderUnitTests extends MappingContextBaseTests {
 
 		assertEquals(expected, mapping, true);
 	}
+
+	@Test // #2942
+	@DisplayName("should use custom  mapped name")
+	void shouldUseCustomMappedName() throws JSONException {
+
+		var expected = """
+					{
+					  "properties": {
+						"_class": {
+						  "type": "keyword",
+						  "index": false,
+						  "doc_values": false
+						},
+						"someText": {
+						  "type": "match_only_text"
+						}
+					  }
+					}
+				""";
+		String mapping = getMappingBuilder().buildPropertyMapping(FieldMappedNameEntity.class);
+
+		assertEquals(expected, mapping, true);
+	}
+
+	@Test // #2942
+	@DisplayName("should use custom  mapped name for multifield")
+	void shouldUseCustomMappedNameMultiField() throws JSONException {
+
+		var expected = """
+					{
+					  "properties": {
+						"_class": {
+						  "type": "keyword",
+						  "index": false,
+						  "doc_values": false
+						},
+						"description": {
+						  "type": "match_only_text",
+						  "fields": {
+							"lower_case": {
+							  "type": "constant_keyword",
+							  "normalizer": "lower_case_normalizer"
+							}
+						  }
+						}
+					  }
+					}
+				""";
+		String mapping = getMappingBuilder().buildPropertyMapping(MultiFieldMappedNameEntity.class);
+
+		assertEquals(expected, mapping, true);
+	}
+
+	@Test // #2952
+	void shouldMapNullityParameters() throws JSONException {
+		// Given
+		String expected = """
+				{
+				   "properties": {
+				     "_class": {
+				       "type": "keyword",
+				       "index": false,
+				       "doc_values": false
+				     },
+				     "empty-field": {
+				       "type": "keyword",
+				       "null_value": "EMPTY",
+				       "fields": {
+				         "suffix": {
+				           "type": "keyword",
+				           "null_value": "EMPTY_TEXT"
+				         }
+				       }
+				     }
+				   }
+				 }
+				""";
+
+		// When
+		String result = getMappingBuilder().buildPropertyMapping(MultiFieldWithNullEmptyParameters.class);
+
+		// Then
+		assertEquals(expected, result, true);
+	}
+
 	// region entities
 
 	@Document(indexName = "ignore-above-index")
@@ -2063,6 +2195,35 @@ public class MappingBuilderUnitTests extends MappingContextBaseTests {
 		}
 	}
 
+	@SuppressWarnings("unused")
+	static class DenseVectorEntityWithKnnSearch {
+		@Nullable
+		@Id private String id;
+
+		@Nullable
+		@Field(type = FieldType.Dense_Vector, dims = 16, elementType = FieldElementType.FLOAT,
+				knnIndexOptions = @KnnIndexOptions(type = KnnAlgorithmType.HNSW, m = 16, efConstruction = 100),
+				knnSimilarity = KnnSimilarity.DOT_PRODUCT) private float[] my_vector;
+
+		@Nullable
+		public String getId() {
+			return id;
+		}
+
+		public void setId(@Nullable String id) {
+			this.id = id;
+		}
+
+		@Nullable
+		public float[] getMy_vector() {
+			return my_vector;
+		}
+
+		public void setMy_vector(@Nullable float[] my_vector) {
+			this.my_vector = my_vector;
+		}
+	}
+
 	@Mapping(enabled = false)
 	static class DisabledMappingEntity {
 		@Nullable
@@ -2113,6 +2274,12 @@ public class MappingBuilderUnitTests extends MappingContextBaseTests {
 		public void setText(@Nullable String text) {
 			this.text = text;
 		}
+	}
+
+	static class DenseVectorMisMatchConfidenceIntervalClass {
+		@Field(type = Dense_Vector, dims = 16, elementType = FieldElementType.FLOAT,
+				knnIndexOptions = @KnnIndexOptions(type = KnnAlgorithmType.HNSW, m = 16, confidenceInterval = 0.95F),
+				knnSimilarity = KnnSimilarity.DOT_PRODUCT) private float[] dense_vector;
 	}
 
 	static class DisabledMappingProperty {
@@ -2395,6 +2562,10 @@ public class MappingBuilderUnitTests extends MappingContextBaseTests {
 				excludeFromSource = true) private LocalDate excludedDate;
 		@Nullable
 		@Field(type = Nested) private NestedExcludedFieldEntity nestedEntity;
+		@Nullable
+		@MultiField(mainField = @Field(name = "excluded-multifield", type = Text, excludeFromSource = true), otherFields = {
+				@InnerField(suffix = "keyword", type = Keyword)
+		}) private String excludedMultifield;
 	}
 
 	@SuppressWarnings("unused")
@@ -2430,6 +2601,30 @@ public class MappingBuilderUnitTests extends MappingContextBaseTests {
 		@Field(type = Text) private String someText;
 		@Nullable
 		@Field(type = Text) private String otherText;
+	}
+
+	@SuppressWarnings("unused")
+	private static class FieldMappedNameEntity {
+		@Nullable
+		@Field(type = Text, mappedTypeName = "match_only_text") private String someText;
+	}
+
+	@SuppressWarnings("unused")
+	private static class MultiFieldMappedNameEntity {
+		@Nullable
+		@MultiField(mainField = @Field(type = FieldType.Text, mappedTypeName = "match_only_text"),
+				otherFields = { @InnerField(suffix = "lower_case",
+						type = FieldType.Keyword, normalizer = "lower_case_normalizer",
+						mappedTypeName = "constant_keyword") }) private String description;
+	}
+
+	@SuppressWarnings("unused")
+	private static class MultiFieldWithNullEmptyParameters {
+		@Nullable
+		@MultiField(
+				mainField = @Field(name = "empty-field", type = FieldType.Keyword, nullValue = "EMPTY", storeNullValue = true),
+				otherFields = {
+						@InnerField(suffix = "suffix", type = Keyword, nullValue = "EMPTY_TEXT") }) private List<String> emptyField;
 	}
 	// endregion
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2024 the original author or authors.
+ * Copyright 2016-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import org.springframework.lang.Nullable;
 
 /**
  * SourceFilter for providing includes and excludes. Using these helps in reducing the amount of data that is returned
- * from Elasticsearch especially when the stored docuements are large and only some fields from these documents are
+ * from Elasticsearch especially when the stored documents are large and only some fields from these documents are
  * needed. If the SourceFilter includes the name of a property that has a different name mapped in Elasticsearch (see
  * {@link Field#name()} this will automatically be mapped.
  *
@@ -40,4 +40,15 @@ public interface SourceFilter {
 	 */
 	@Nullable
 	String[] getExcludes();
+
+	/**
+	 * Flag to set the _source parameter in a query to true or false. If this is not null, the values returned from
+	 * getIncludes() and getExcludes() are ignored
+	 *
+	 * @since 5.5
+	 */
+	@Nullable
+	default Boolean fetchSource() {
+		return null;
+	}
 }

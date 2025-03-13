@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 the original author or authors.
+ * Copyright 2024-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,8 +24,8 @@ import org.springframework.data.elasticsearch.repository.query.ElasticsearchPara
 import org.springframework.data.elasticsearch.repository.support.value.ElasticsearchCollectionValueToStringConverter;
 import org.springframework.data.elasticsearch.repository.support.value.ElasticsearchQueryValueConversionService;
 import org.springframework.data.elasticsearch.repository.support.value.ElasticsearchStringValueToStringConverter;
+import org.springframework.data.expression.ValueEvaluationContextProvider;
 import org.springframework.data.repository.query.QueryMethod;
-import org.springframework.data.repository.query.QueryMethodEvaluationContextProvider;
 import org.springframework.expression.EvaluationContext;
 import org.springframework.expression.Expression;
 import org.springframework.expression.ParserContext;
@@ -53,11 +53,11 @@ public class QueryStringSpELEvaluator {
 	private final String queryString;
 	private final ElasticsearchParametersParameterAccessor parameterAccessor;
 	private final QueryMethod queryMethod;
-	private final QueryMethodEvaluationContextProvider evaluationContextProvider;
+	private final ValueEvaluationContextProvider evaluationContextProvider;
 	private final TypeConverter elasticsearchSpELTypeConverter;
 
 	public QueryStringSpELEvaluator(String queryString, ElasticsearchParametersParameterAccessor parameterAccessor,
-			QueryMethod queryMethod, QueryMethodEvaluationContextProvider evaluationContextProvider,
+			QueryMethod queryMethod, ValueEvaluationContextProvider evaluationContextProvider,
 			ConversionService conversionService) {
 
 		Assert.notNull(queryString, "queryString must not be null");
@@ -83,8 +83,8 @@ public class QueryStringSpELEvaluator {
 		Expression expr = getQueryExpression(queryString);
 
 		if (expr != null) {
-			EvaluationContext context = evaluationContextProvider.getEvaluationContext(parameterAccessor.getParameters(),
-					parameterAccessor.getValues());
+			EvaluationContext context = evaluationContextProvider.getEvaluationContext(parameterAccessor.getValues())
+					.getRequiredEvaluationContext();
 
 			if (context instanceof StandardEvaluationContext standardEvaluationContext) {
 				standardEvaluationContext.setTypeConverter(elasticsearchSpELTypeConverter);
